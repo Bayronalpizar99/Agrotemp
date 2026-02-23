@@ -54,7 +54,7 @@ export const ParticleBackground = memo(function ParticleBackground() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
-    let timeoutId: NodeJS.Timeout;
+    let timeoutId: ReturnType<typeof setTimeout>;
     const handleResize = () => {
       clearTimeout(timeoutId);
       timeoutId = setTimeout(() => {
