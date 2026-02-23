@@ -179,8 +179,7 @@ export const ParticleBackground = memo(function ParticleBackground() {
           top: 0, 
           left: 0, 
           width: '100vw', 
-          height: '100lvh', // Usa lvh para evitar redimensionamiento en móviles
-          minHeight: '100vh', // Fallback para navegadores antiguos
+          height: '100vh', // Volvemos a vh, pero el contenedor fijo evita el problema
           zIndex: -1, 
           pointerEvents: 'none',
           backgroundColor: '#171717'
@@ -191,7 +190,7 @@ export const ParticleBackground = memo(function ParticleBackground() {
           id="tsparticles"
           options={{
             ...particleOptions,
-            fullScreen: { enable: false },
+            fullScreen: { enable: true, zIndex: -1 }, // Reactivamos fullScreen
           }}
           style={{ width: '100%', height: '100%' }}
         />
