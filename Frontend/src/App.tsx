@@ -35,35 +35,37 @@ function App() {
   }, [activePage]);
 
   return (
-    <Box minH="100vh">
+    <Box minH="100vh" position="relative" isolation="isolate">
       <ParticleBackground />
-      
-      <Header
-        isVisible={true}
-        activePage={activePage}
-        setActivePage={setActivePage}
-        // ✅ Se pasa un valor fijo o se puede eliminar la prop si ya no es necesaria en Header.
-        isScrolled={false} 
-      />
-      
-      <Container
-        maxW="container.xl"
-        px={{ base: 3, md: 4 }}
-        py={4}
-        pt={{ base: 28, md: 40 }}
-      >
-        <Box display={activePage === 'Reporte IA' ? 'block' : 'none'}>
-          <AgroReportPage />
-        </Box>
-        <Box display={activePage === 'Dashboard' ? 'block' : 'none'}>
-          <WeatherDashboard />
-        </Box>
-        <Box display={activePage === 'Info' ? 'block' : 'none'}>
-          <InfoPage />
-        </Box>
-      </Container>
-      
-      {activePage !== 'Reporte IA' && <Footer />}
+
+      <Box position="relative" zIndex={1}>
+        <Header
+          isVisible={true}
+          activePage={activePage}
+          setActivePage={setActivePage}
+          // ✅ Se pasa un valor fijo o se puede eliminar la prop si ya no es necesaria en Header.
+          isScrolled={false} 
+        />
+
+        <Container
+          maxW="container.xl"
+          px={{ base: 3, md: 4 }}
+          py={4}
+          pt={{ base: 28, md: 40 }}
+        >
+          <Box display={activePage === 'Reporte IA' ? 'block' : 'none'}>
+            <AgroReportPage />
+          </Box>
+          <Box display={activePage === 'Dashboard' ? 'block' : 'none'}>
+            <WeatherDashboard />
+          </Box>
+          <Box display={activePage === 'Info' ? 'block' : 'none'}>
+            <InfoPage />
+          </Box>
+        </Container>
+
+        {activePage !== 'Reporte IA' && <Footer />}
+      </Box>
     </Box>
   );
 }

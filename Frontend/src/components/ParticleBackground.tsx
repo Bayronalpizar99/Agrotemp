@@ -49,30 +49,28 @@ const loadOrCreateParticleLayout = (): ParticleLayoutPoint[] => {
 export const ParticleBackground = memo(function ParticleBackground() {
   const [init, setInit] = useState(false);
   const [particleLayout] = useState<ParticleLayoutPoint[]>(() => loadOrCreateParticleLayout());
-  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 0);
+  const [isTouchDevice, setIsTouchDevice] = useState(false);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    
-    let timeoutId: ReturnType<typeof setTimeout>;
-    const handleResize = () => {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
-        setWindowWidth((prev) => {
-          // Solo actualizamos si el ancho cambia (ej. rotar el celular)
-          // Esto ignora los cambios de altura al hacer scroll en móviles
-          if (prev !== window.innerWidth) {
-            return window.innerWidth;
-          }
-          return prev;
-        });
-      }, 150);
+    if (typeof window === "undefined") return;
+
+    const touchQuery = window.matchMedia("(hover: none), (pointer: coarse)");
+    const updateTouchMode = () => {
+      setIsTouchDevice(touchQuery.matches);
     };
 
-    window.addEventListener('resize', handleResize);
+    updateTouchMode();
+
+    if (typeof touchQuery.addEventListener === "function") {
+      touchQuery.addEventListener("change", updateTouchMode);
+      return () => {
+        touchQuery.removeEventListener("change", updateTouchMode);
+      };
+    }
+
+    touchQuery.addListener(updateTouchMode);
     return () => {
-      window.removeEventListener('resize', handleResize);
-      clearTimeout(timeoutId);
+      touchQuery.removeListener(updateTouchMode);
     };
   }, []);
 
@@ -88,22 +86,19 @@ export const ParticleBackground = memo(function ParticleBackground() {
     () => ({
       fullScreen: {
         enable: true,
-        zIndex: -1,
+        zIndex: 0,
       },
       background: {
         color: {
           value: "#171717",
         },
       },
-      fpsLimit: 120,
+      fpsLimit: isTouchDevice ? 60 : 120,
       interactivity: {
         events: {
           onHover: {
-            enable: true,
+            enable: !isTouchDevice,
             mode: "bubble",
-          },
-          resize: {
-            enable: false,
           },
         },
         modes: {
@@ -130,8 +125,7 @@ export const ParticleBackground = memo(function ParticleBackground() {
           },
           // ✅ MEJORA: Se desactiva el movimiento aleatorio.
           random: false,
-          // ✅ MEJORA: Se ajusta la velocidad a 1.
-          speed: 1,
+          speed: isTouchDevice ? 0.8 : 1,
           // ✅ MEJORA: Se fuerza el movimiento en línea recta.
           straight: true,
         },
@@ -152,7 +146,9 @@ export const ParticleBackground = memo(function ParticleBackground() {
           value: { min: 1, max: 2 },
         },
       },
-      manualParticles: particleLayout.map((point) => ({
+      manualParticles: particleLayout
+        .slice(0, isTouchDevice ? 90 : PARTICLE_COUNT)
+        .map((point) => ({
         position: {
           x: point.x,
           y: point.y,
@@ -166,35 +162,24 @@ export const ParticleBackground = memo(function ParticleBackground() {
           },
         },
       })),
-      detectRetina: true,
+      detectRetina: !isTouchDevice,
     }),
-    [particleLayout],
+    [isTouchDevice, particleLayout],
   );
 
   if (init) {
     return (
-      <div 
-        style={{ 
-          position: 'fixed', 
-          top: 0, 
-          left: 0, 
-          width: '100vw', 
-          height: '100vh', // Volvemos a vh, pero el contenedor fijo evita el problema
-          zIndex: -1, 
-          pointerEvents: 'none',
-          backgroundColor: '#171717'
+      <Particles
+        id="tsparticles"
+        options={particleOptions}
+        style={{
+          position: "fixed",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          pointerEvents: "none",
         }}
-      >
-        <Particles
-          key={windowWidth}
-          id="tsparticles"
-          options={{
-            ...particleOptions,
-            fullScreen: { enable: true, zIndex: -1 }, // Reactivamos fullScreen
-          }}
-          style={{ width: '100%', height: '100%' }}
-        />
-      </div>
+      />
     );
   }
 
