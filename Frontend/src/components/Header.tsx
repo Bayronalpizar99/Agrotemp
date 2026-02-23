@@ -169,8 +169,8 @@ export const Header = ({ isVisible, activePage, setActivePage }: HeaderProps) =>
     bg="transparent"
     position="fixed"
     top={{ base: 1, md: 4 }}
-    left="50%"
-    transform="translateX(-50%)"
+    left={0}
+    right={0}
     zIndex={1000}
     opacity={isVisible ? 1 : 0}
     transition="opacity 0.3s ease-in-out"

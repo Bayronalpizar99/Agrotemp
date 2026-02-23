@@ -33,10 +33,15 @@ const theme = extendTheme({
   },
   styles: {
     global: {
+      html: {
+        overflowY: 'scroll',
+        scrollbarGutter: 'stable',
+      },
       body: {
         bg: '#171717',
         color: '#ffffff',
         fontFeatureSettings: '"cv11", "cv03", "cv04", "cv09"',
+        overflowX: 'hidden',
       },
       '*': {
         borderColor: 'rgba(255, 255, 255, 0.1)',
