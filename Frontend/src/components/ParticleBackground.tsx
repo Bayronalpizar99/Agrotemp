@@ -49,6 +49,32 @@ const loadOrCreateParticleLayout = (): ParticleLayoutPoint[] => {
 export const ParticleBackground = memo(function ParticleBackground() {
   const [init, setInit] = useState(false);
   const [particleLayout] = useState<ParticleLayoutPoint[]>(() => loadOrCreateParticleLayout());
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 0);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    let timeoutId: NodeJS.Timeout;
+    const handleResize = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        setWindowWidth((prev) => {
+          // Solo actualizamos si el ancho cambia (ej. rotar el celular)
+          // Esto ignora los cambios de altura al hacer scroll en móviles
+          if (prev !== window.innerWidth) {
+            return window.innerWidth;
+          }
+          return prev;
+        });
+      }, 150);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      clearTimeout(timeoutId);
+    };
+  }, []);
 
   useEffect(() => {
     initParticlesEngine(async (engine) => {
@@ -75,6 +101,9 @@ export const ParticleBackground = memo(function ParticleBackground() {
           onHover: {
             enable: true,
             mode: "bubble",
+          },
+          resize: {
+            enable: false,
           },
         },
         modes: {
@@ -144,10 +173,29 @@ export const ParticleBackground = memo(function ParticleBackground() {
 
   if (init) {
     return (
-      <Particles
-        id="tsparticles"
-        options={particleOptions}
-      />
+      <div 
+        style={{ 
+          position: 'fixed', 
+          top: 0, 
+          left: 0, 
+          width: '100vw', 
+          height: '100lvh', // Usa lvh para evitar redimensionamiento en móviles
+          minHeight: '100vh', // Fallback para navegadores antiguos
+          zIndex: -1, 
+          pointerEvents: 'none',
+          backgroundColor: '#171717'
+        }}
+      >
+        <Particles
+          key={windowWidth}
+          id="tsparticles"
+          options={{
+            ...particleOptions,
+            fullScreen: { enable: false },
+          }}
+          style={{ width: '100%', height: '100%' }}
+        />
+      </div>
     );
   }
 
