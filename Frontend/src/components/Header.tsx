@@ -270,15 +270,23 @@ export const Header = ({ isVisible, activePage, setActivePage }: HeaderProps) =>
     </Flex>
 
     {/* Modal de selección de fechas */}
-    <Modal isOpen={isOpen} onClose={onClose}>
-      <ModalOverlay />
-      <ModalContent bg="gray.800" mx={4}>
-        <ModalHeader color="white">Seleccionar rango de fechas</ModalHeader>
-        <ModalCloseButton />
-        <ModalBody>
-          <VStack spacing={4}>
+    <Modal isOpen={isOpen} onClose={onClose} isCentered>
+      <ModalOverlay backdropFilter="blur(5px)" bg="blackAlpha.700" />
+      <ModalContent 
+        bg="#1A1A1A" 
+        mx={4}
+        border="1px solid rgba(255, 255, 255, 0.1)"
+        borderRadius="xl"
+        boxShadow="0 10px 40px rgba(0, 0, 0, 0.5)"
+      >
+        <ModalHeader color="white" borderBottom="1px solid rgba(255, 255, 255, 0.05)">
+          Descargar Datos Históricos
+        </ModalHeader>
+        <ModalCloseButton color="white" mt={1} />
+        <ModalBody py={6}>
+          <VStack spacing={5}>
             <Box w="full">
-              <FormLabel color="white">Fecha inicial</FormLabel>
+              <FormLabel color="gray.300" fontSize="sm">Fecha inicial</FormLabel>
               <DatePicker
                 selected={startDate}
                 onChange={handleDateSelect}
@@ -289,7 +297,7 @@ export const Header = ({ isVisible, activePage, setActivePage }: HeaderProps) =>
               />
             </Box>
             <Box w="full">
-              <FormLabel color="white">Fecha final</FormLabel>
+              <FormLabel color="gray.300" fontSize="sm">Fecha final</FormLabel>
               <DatePicker
                 selected={endDate}
                 onChange={handleDateSelect}
@@ -303,12 +311,27 @@ export const Header = ({ isVisible, activePage, setActivePage }: HeaderProps) =>
           </VStack>
         </ModalBody>
 
-        <ModalFooter>
-          <Button variant="ghost" mr={3} onClick={onClose}>
+        <ModalFooter borderTop="1px solid rgba(255, 255, 255, 0.05)">
+          <Button 
+            variant="ghost" 
+            mr={3} 
+            onClick={onClose}
+            color="gray.300"
+            _hover={{ bg: "whiteAlpha.100", color: "white" }}
+          >
             Cancelar
           </Button>
           <Button
-            colorScheme="blue"
+            bgGradient="linear(to-r, #ff8a50, #ff6b35)"
+            color="white"
+            _hover={{
+              bgGradient: "linear(to-r, #ff6b35, #ff8a50)",
+              transform: "translateY(-1px)",
+              boxShadow: "0 4px 12px rgba(255, 138, 80, 0.3)"
+            }}
+            _active={{
+              transform: "translateY(0)",
+            }}
             onClick={handleExport}
             isLoading={isLoading}
             loadingText="Descargando..."
