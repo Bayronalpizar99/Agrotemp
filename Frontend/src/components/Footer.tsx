@@ -21,7 +21,7 @@ export const Footer = () => {
 
       <HStack justify="space-between" align="center" w="100%" maxW="container.xl" mx="auto">
         <Text fontSize="xs" color="brand.mutedText">
-          © 2025 Agrotemp. All rights reserved.
+          © 2026 Agrotemp. All rights reserved.
         </Text>
 
         <Text fontSize="xs" color="brand.subtext">
