@@ -769,7 +769,7 @@ export const AgroReportPage = () => {
                             w="full"
                             fontSize="xs"
                             color="gray.300"
-                            css={{ '::-webkit-calendar-picker-indicator': { filter: 'invert(0.6) opacity(0.6)' } }}
+                            sx={{ colorScheme: 'dark', '::-webkit-calendar-picker-indicator': { filter: 'invert(0.6) opacity(0.6)' } }}
                             _hover={{ bg: "whiteAlpha.200" }}
                         />
                         <Input 
@@ -784,7 +784,7 @@ export const AgroReportPage = () => {
                             w="full"
                             fontSize="xs"
                             color="gray.300"
-                            css={{ '::-webkit-calendar-picker-indicator': { filter: 'invert(0.6) opacity(0.6)' } }}
+                            sx={{ colorScheme: 'dark', '::-webkit-calendar-picker-indicator': { filter: 'invert(0.6) opacity(0.6)' } }}
                             _hover={{ bg: "whiteAlpha.200" }}
                         />
                     </HStack>
@@ -876,7 +876,7 @@ export const AgroReportPage = () => {
                     w="130px"
                     fontSize="xs"
                     color="gray.300"
-                    css={{ '::-webkit-calendar-picker-indicator': { filter: 'invert(0.6) opacity(0.6)' } }}
+                    sx={{ colorScheme: 'dark', '::-webkit-calendar-picker-indicator': { filter: 'invert(0.6) opacity(0.6)' } }}
                     _hover={{ bg: "whiteAlpha.200" }}
                 />
                 
@@ -892,7 +892,7 @@ export const AgroReportPage = () => {
                     w="130px"
                     fontSize="xs"
                     color="gray.300"
-                    css={{ '::-webkit-calendar-picker-indicator': { filter: 'invert(0.6) opacity(0.6)' } }}
+                    sx={{ colorScheme: 'dark', '::-webkit-calendar-picker-indicator': { filter: 'invert(0.6) opacity(0.6)' } }}
                     _hover={{ bg: "whiteAlpha.200" }}
                 />
                 <Button 
