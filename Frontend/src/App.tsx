@@ -70,7 +70,7 @@ function App() {
         {activePage !== 'Reporte IA' && <Footer />}
       </Box>
     </Box>
-    <FeedbackWidget />
+    <FeedbackWidget activePage={activePage} />
     </>
   );
 }

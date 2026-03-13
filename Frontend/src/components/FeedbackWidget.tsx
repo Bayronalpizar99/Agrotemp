@@ -15,7 +15,7 @@ import { feedbackService } from '../services/feedback.service';
 
 const CATEGORIES = ['Sugerencia', 'Error o problema', 'Consulta', 'Otro'];
 
-export function FeedbackWidget() {
+export function FeedbackWidget({ activePage }: { activePage: string }) {
   const [isOpen, setIsOpen] = useState(false);
   const [rating, setRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
@@ -50,7 +50,7 @@ export function FeedbackWidget() {
     <>
       {/* ── Floating tab — desktop right edge ── */}
       <Box
-        display={{ base: 'none', md: 'flex' }}
+        display={{ base: activePage === 'Reporte IA' ? 'flex' : 'none', md: 'flex' }}
         position="fixed"
         right={0}
         top="50%"
@@ -88,7 +88,7 @@ export function FeedbackWidget() {
 
       {/* ── FAB — mobile ── */}
       <IconButton
-        display={{ base: 'flex', md: 'none' }}
+        display={{ base: activePage === 'Reporte IA' ? 'none' : 'flex', md: 'none' }}
         position="fixed"
         bottom="80px"
         right="16px"
