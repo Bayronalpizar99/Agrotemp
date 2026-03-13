@@ -469,6 +469,26 @@ export const InfoPage = () => {
             <Text as="span" color="white" fontWeight="500">Bayron Alpízar</Text>.
             Puedes encontrar más de mi trabajo y contactarme a través de mis perfiles profesionales.
           </Text>
+          <Link
+            href="https://bayronaq.org/"
+            isExternal
+            display="inline-flex"
+            alignItems="center"
+            gap={2}
+            mt={3}
+            px={4}
+            py={2}
+            borderRadius="full"
+            border="1px solid rgba(255,129,68,0.35)"
+            color="#ff8a50"
+            fontSize="sm"
+            fontWeight="medium"
+            _hover={{ bg: 'rgba(255,129,68,0.08)', borderColor: 'rgba(255,129,68,0.6)', textDecoration: 'none' }}
+            transition="all 0.2s ease"
+          >
+            <Icon as={FiExternalLink} boxSize={3.5} />
+            bayronaq.org
+          </Link>
         </TimelineItem>
 
       </Box>
