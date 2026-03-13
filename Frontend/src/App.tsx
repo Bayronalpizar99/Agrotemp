@@ -52,6 +52,7 @@ function App() {
           px={{ base: 3, md: 4 }}
           py={4}
           pt={{ base: 28, md: 40 }}
+          pb={{ base: 20, md: 16 }}
         >
           <Box display={activePage === 'Reporte IA' ? 'block' : 'none'}>
             <AgroReportPage />

@@ -13,11 +13,13 @@ export class AgroAnalyticsController {
   @ApiQuery({ name: 'endDate', required: true, example: '2025-01-31' })
   @ApiQuery({ name: 'cropBaseTemp', required: false, example: 10, description: 'Temperatura base del cultivo (default: 10)' })
   @ApiQuery({ name: 'cropMaxTemp', required: false, example: 30, description: 'Temperatura máxima óptima (default: 30)' })
+  @ApiQuery({ name: 'cropName', required: false, example: 'Maíz', description: 'Nombre del cultivo de referencia' })
   async getReport(
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
     @Query('cropBaseTemp') cropBaseTemp?: number,
-    @Query('cropMaxTemp') cropMaxTemp?: number
+    @Query('cropMaxTemp') cropMaxTemp?: number,
+    @Query('cropName') cropName?: string
   ) {
     if (!startDate || !endDate) {
       throw new HttpException('startDate y endDate son requeridos', HttpStatus.BAD_REQUEST);
@@ -27,7 +29,8 @@ export class AgroAnalyticsController {
         startDate,
         endDate,
         cropBaseTemp: cropBaseTemp ? Number(cropBaseTemp) : 10,
-        cropMaxTemp: cropMaxTemp ? Number(cropMaxTemp) : 30
+        cropMaxTemp: cropMaxTemp ? Number(cropMaxTemp) : 30,
+        cropName
     };
 
     try {
@@ -48,12 +51,12 @@ export class AgroAnalyticsController {
   @ApiOperation({ summary: 'Chat con la IA sobre el reporte generado' })
   @ApiBody({ schema: { example: { question: '¿Debo regar mañana?', reportContext: {} } } })
   async chatWithReport(
-    @Body() body: { reportContext: any; question: string },
+    @Body() body: { reportContext: any; question: string; chatHistory?: { role: string; content: string }[] },
   ) {
     if (!body.reportContext || !body.question) {
         throw new BadRequestException('Falta el contexto del reporte o la pregunta.');
     }
-    const answer = await this.analyticsService.chatWithAI(body.question, body.reportContext);
+    const answer = await this.analyticsService.chatWithAI(body.question, body.reportContext, body.chatHistory ?? []);
     return {
         answer
     };

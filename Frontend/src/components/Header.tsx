@@ -190,7 +190,7 @@ export const Header = ({ isVisible, activePage, setActivePage }: HeaderProps) =>
     >
       {/* Logo */}
       <Flex alignItems="center" gap={2}>
-         <Box 
+         <Box
           bg="linear-gradient(135deg, #ff8a50, #ff6b35)"
           p={1.5}
           borderRadius="md"
@@ -200,9 +200,24 @@ export const Header = ({ isVisible, activePage, setActivePage }: HeaderProps) =>
         >
           <Box color="white" fontSize="sm" fontWeight="bold">🌦️</Box>
         </Box>
-        <Heading size="sm" color="white" fontWeight="semibold" whiteSpace="nowrap">
+        <Heading
+          size="sm"
+          color="white"
+          fontFamily="'Fraunces', serif"
+          fontWeight="400"
+          whiteSpace="nowrap"
+          letterSpacing="-0.01em"
+        >
           Agrotemp
         </Heading>
+        <Box
+          w="6px"
+          h="6px"
+          borderRadius="full"
+          bg="#48c78e"
+          flexShrink={0}
+          sx={{ animation: 'livePulse 2.2s ease-in-out infinite' }}
+        />
       </Flex>
 
       {/* Navegación desktop */}

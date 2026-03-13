@@ -6,6 +6,7 @@ export interface AgroReportParams {
   endDate: string;
   cropBaseTemp: number;
   cropMaxTemp: number;
+  cropName?: string;
 }
 
 type StressHours = {
@@ -58,6 +59,7 @@ export const agroAnalyticsService = {
         cropBaseTemp: params.cropBaseTemp.toString(),
         cropMaxTemp: params.cropMaxTemp.toString()
     });
+    if (params.cropName) queryParams.set('cropName', params.cropName);
 
     const response = await fetch(`${API_URL}/report?${queryParams.toString()}`);
 
@@ -74,13 +76,13 @@ export const agroAnalyticsService = {
     return json.data;
   },
 
-  chatWithReport: async (question: string, reportContext: any): Promise<string> => {
+  chatWithReport: async (question: string, reportContext: any, chatHistory: { role: string; content: string }[] = []): Promise<string> => {
     const response = await fetch(`${API_URL}/chat`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ question, reportContext })
+      body: JSON.stringify({ question, reportContext, chatHistory })
     });
 
     if (!response.ok) {

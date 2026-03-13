@@ -4,31 +4,31 @@ import { FiGithub, FiLinkedin } from 'react-icons/fi';
 
 export const Footer = () => {
   return (
-    <Box as="footer" w="100%" px={{ base: 4, md: 12 }} pt={{ base: 10, md: 16 }} pb={{ base: 8, md: 12 }} bg="transparent">
-      {/* Reemplazamos el Divider por un Box con el efecto de gradiente */}
-      <Box
-        height="1px" // Grosor de la línea
-        w="100%"
-        // Gradiente horizontal que coincide con el de las tarjetas
-        bgGradient="linear(to-r, transparent, rgba(255, 129, 68, 0.4), transparent)"
-        mb={8}
-      />
+    <Box
+      as="footer"
+      w="100%"
+      px={{ base: 4, md: 12 }}
+      py={4}
+      bg="rgba(23, 23, 23, 0.85)"
+      backdropFilter="blur(10px)"
+      borderTop="1px solid rgba(255, 255, 255, 0.06)"
+      position="fixed"
+      bottom={0}
+      left={0}
+      right={0}
+      zIndex={5}
+    >
 
-      <VStack spacing={4}>
-        <HStack spacing={5}>
-          <Link href="https://www.linkedin.com/in/bayron-alpízar-quesada-21439a126" isExternal>
-            <FiLinkedin size="20px" />
-          </Link>
-          <Link href="https://github.com/Bayronalpizar99" isExternal>
-            <FiGithub size="20px" />
-          </Link>
-        </HStack>
+      <HStack justify="space-between" align="center" w="100%" maxW="container.xl" mx="auto">
+        <Text fontSize="xs" color="brand.mutedText">
+          © 2025 Agrotemp. All rights reserved.
+        </Text>
 
-        <Text fontSize="sm" color="brand.subtext" textAlign="center">
+        <Text fontSize="xs" color="brand.subtext">
           Developed by{' '}
-          <Link 
+          <Link
             href="https://github.com/Bayronalpizar99"
-            isExternal 
+            isExternal
             color="brand.orangeLight"
             fontWeight="medium"
           >
@@ -36,10 +36,27 @@ export const Footer = () => {
           </Link>
         </Text>
 
-        <Text fontSize="sm" color="brand.mutedText" textAlign="center">
-          © 2025 Agrotemp . All rights reserved.
-        </Text>
-      </VStack>
+        <HStack spacing={4}>
+          <Link
+            href="https://www.linkedin.com/in/bayron-alpízar-quesada-21439a126"
+            isExternal
+            color="brand.mutedText"
+            _hover={{ color: 'brand.orange' }}
+            transition="color 0.2s ease"
+          >
+            <FiLinkedin size="16px" />
+          </Link>
+          <Link
+            href="https://github.com/Bayronalpizar99"
+            isExternal
+            color="brand.mutedText"
+            _hover={{ color: 'brand.orange' }}
+            transition="color 0.2s ease"
+          >
+            <FiGithub size="16px" />
+          </Link>
+        </HStack>
+      </HStack>
     </Box>
   );
 }

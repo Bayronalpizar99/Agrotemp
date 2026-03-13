@@ -5,10 +5,11 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { ConfigService } from '@nestjs/config';
 
 export interface AgroReportParams {
-  startDate: string; // YYYY-MM-DD
-  endDate: string;   // YYYY-MM-DD
+  startDate: string;    // YYYY-MM-DD
+  endDate: string;      // YYYY-MM-DD
   cropBaseTemp: number; // Temperatura base del cultivo (ej. Maíz = 10°C)
   cropMaxTemp: number;  // Temperatura máxima óptima (ej. Maíz = 30°C)
+  cropName?: string;    // Nombre del cultivo (ej. "Maíz", "Café")
 }
 
 @Injectable()
@@ -299,7 +300,8 @@ export class AgroAnalyticsService {
 
   // --- Integración con Google Gemini ---
   private async callGenerativeAI(metrics: any, params: AgroReportParams): Promise<string> {
-    const { cropBaseTemp, cropMaxTemp } = params;
+    const { cropBaseTemp, cropMaxTemp, cropName } = params;
+    const cropLabel = cropName ? `cultivo de referencia: ${cropName}` : 'cultivo no especificado';
 
     if (!this.genAI) {
          return '[SIMULACIÓN IA] El backend no tiene configurada la API KEY de Gemini en el archivo .env. Por favor, configura GEMINI_API_KEY para recibir análisis real.';
@@ -310,28 +312,34 @@ export class AgroAnalyticsService {
         const model = this.genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
         const prompt = `
-          Eres un experto Ingeniero Agrónomo especializado en agricultura de precisión.
-          Genera un breve pero impactante reporte técnico para un cultivo con los siguientes parámetros:
-          - T. Base: ${cropBaseTemp}°C
-          - T. Máxima: ${cropMaxTemp}°C
+          Eres un experto en agrometeorología. Tu tarea es interpretar condiciones climáticas de campo usando datos de una estación meteorológica.
 
-          DATOS AGROMETEOROLÓGICOS CALCULADOS (Periodo analizado):
-          - Grados Día Acumulados (GDD): ${metrics.gdd}
-          - Horas de Estrés por Calor (> ${cropMaxTemp}°C): ${metrics.stressHours.heatStressHours} hrs
-          - Horas de Estrés por Frío (< ${cropBaseTemp}°C): ${metrics.stressHours.coldStressHours} hrs
+          IMPORTANTE — LIMITACIÓN DE DATOS:
+          No conoces la fecha de siembra, la variedad, ni el estado fenológico actual del cultivo.
+          Por lo tanto, NUNCA debes afirmar ni inferir en qué etapa de desarrollo se encuentra el cultivo (germinación, floración, madurez, etc.).
+          Los GDD son únicamente una referencia de la acumulación térmica del periodo analizado, no una indicación del estado del cultivo.
+
+          PARÁMETROS DE REFERENCIA (${cropLabel}):
+          - Temperatura base: ${cropBaseTemp}°C
+          - Temperatura máxima óptima: ${cropMaxTemp}°C
+
+          DATOS AGROMETEOROLÓGICOS DEL PERIODO:
+          - Grados Día Acumulados (GDD): ${metrics.gdd} — energía térmica disponible en el periodo.
+          - Horas con temperatura > ${cropMaxTemp}°C (estrés por calor): ${metrics.stressHours.heatStressHours} hrs
+          - Horas con temperatura < ${cropBaseTemp}°C (estrés por frío): ${metrics.stressHours.coldStressHours} hrs
           - Lluvia Total: ${metrics.waterBalance.totalInput} mm
-          - Evapotranspiración (ETo): ${metrics.waterBalance.totalOutput} mm
-          - Balance Hídrico: ${metrics.waterBalance.balance} mm
+          - Evapotranspiración estimada (ETo): ${metrics.waterBalance.totalOutput} mm
+          - Balance Hídrico (Lluvia − ETo): ${metrics.waterBalance.balance} mm
           - Riesgo de Enfermedades Fúngicas: ${metrics.diseaseRisk}
-          - Ventanas de Pulverización Óptimas: ${metrics.optimalWindows.optimalSprayHours} horas disponibles.
+          - Horas favorables para pulverización (viento < 10 km/h, sin lluvia): ${metrics.optimalWindows.optimalSprayHours} hrs
 
           TAREA:
-          Escribe un análisis de 3 párrafos en texto plano (sin usar markdown complejo como negritas o títulos grandes, solo texto fluido).
-          1. Estado Fenológico: Interpreta los GDD acumulados. ¿El cultivo crece rápido o lento?
-          2. Alertas de Estrés: Analiza el estrés hídrico (balance) y térmico. ¿Es grave?
-          3. Recomendaciones Prácticas: ¿Qué debo hacer mañana? (Riego, aplicar fungicida, aprovechar ventanas de pulverización, etc.).
-          
-          Mantén un tono profesional, directo y útil para la toma de decisiones.
+          Escribe exactamente 3 párrafos en texto plano (sin markdown, sin negritas, sin listas).
+          1. Condiciones Térmicas del Periodo: Describe la acumulación térmica (GDD) y las horas de estrés como indicadores del ambiente. No hagas ninguna afirmación sobre el estado o etapa del cultivo.
+          2. Condiciones Hídricas y Riesgo Sanitario: Analiza el balance hídrico y el riesgo de enfermedades. ¿Hay déficit o exceso? ¿Es preocupante el riesgo fúngico?
+          3. Recomendaciones Operativas: ¿Qué acciones se sugieren dado el clima? (riego, aplicación de fungicida, aprovechar ventanas de pulverización, monitoreo).
+
+          Tono: profesional, directo y accionable para la toma de decisiones en campo.
         `;
 
         this.logger.log('Enviando prompt a Gemini...');
@@ -346,28 +354,37 @@ export class AgroAnalyticsService {
   }
 
   // --- Chat Contextual ---
-  async chatWithAI(question: string, context: any): Promise<string> {
+  async chatWithAI(question: string, context: any, chatHistory: { role: string; content: string }[] = []): Promise<string> {
     if (!this.genAI) return 'IA no configurada.';
 
     try {
         const model = this.genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        const cropLabel = context.cropName ? `cultivo de referencia: ${context.cropName}` : 'cultivo no especificado';
+
+        const historySection = chatHistory.length > 0
+          ? `\nHISTORIAL DE LA CONVERSACIÓN:\n${chatHistory.map(m => `${m.role === 'user' ? 'Usuario' : 'Asistente'}: ${m.content}`).join('\n')}\n`
+          : '';
 
         const prompt = `
-          Tú eres el mismo Ingeniero Agrónomo experto que generó el reporte anterior.
-          
-          CONTEXTO DEL CULTIVO ACTUAL (Métricas ya calculadas):
-          - Periodo: ${context.period?.startDate} a ${context.period?.endDate}
-          - GDD: ${context.metrics?.gdd}
-          - Balance Hídrico: ${context.metrics?.waterBalance?.balance} mm
-          - Riesgo Enfermedad: ${context.metrics?.diseaseRisk}
-          
-          ANÁLISIS PREVIO QUE DISTE:
-          "${context.aiAnalysis}"
+          Eres un experto en agrometeorología que generó el análisis climático que se muestra a continuación.
 
-          PREGUNTA DEL USUARIO:
+          LIMITACIÓN IMPORTANTE:
+          No conoces la fecha de siembra, la variedad ni el estado fenológico del cultivo.
+          No debes afirmar ni inferir en qué etapa de desarrollo se encuentra el cultivo.
+          Solo puedes hablar de condiciones climáticas y su posible impacto general en ${cropLabel}.
+
+          CONTEXTO CLIMÁTICO DEL REPORTE (Periodo: ${context.period?.startDate} a ${context.period?.endDate}):
+          - GDD acumulados: ${context.metrics?.gdd}
+          - Balance Hídrico: ${context.metrics?.waterBalance?.balance} mm
+          - Riesgo de Enfermedad Fúngica: ${context.metrics?.diseaseRisk}
+
+          ANÁLISIS PREVIO GENERADO:
+          "${context.aiAnalysis}"
+          ${historySection}
+          PREGUNTA ACTUAL DEL USUARIO:
           "${question}"
 
-          Responde directamente a la pregunta del usuario usando el contexto anterior. Sé breve, práctico y técnico pero accesible.
+          Responde directamente a la pregunta usando el contexto anterior y el historial de conversación. Sé breve, práctico y técnico. Responde en texto plano, sin markdown, sin negritas, sin asteriscos, sin listas con guiones. Si la pregunta implica conocimiento del estado del cultivo que no tienes (etapa fenológica, fecha de siembra, variedad), indícalo claramente antes de responder con lo que sí puedes inferir del clima.
         `;
 
         const result = await model.generateContent(prompt);

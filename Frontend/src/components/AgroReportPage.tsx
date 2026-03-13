@@ -1,5 +1,6 @@
 // src/components/AgroReportPage.tsx
 import { useState, useRef, useEffect } from 'react';
+import { keyframes } from '@emotion/react';
 import {
   Box,
   Heading,
@@ -33,16 +34,17 @@ import {
   Collapse
 } from '@chakra-ui/react';
 import {
-  FiCpu, 
-  FiDroplet, 
-  FiSun, 
-  FiThermometer, 
+  FiCpu,
+  FiDroplet,
+  FiSun,
+  FiThermometer,
   FiAlertCircle,
   FiSend,
   FiUser,
   FiMic,
   FiChevronDown,
-  FiChevronUp
+  FiChevronUp,
+  FiCalendar
 } from 'react-icons/fi';
 import { agroAnalyticsService } from '../services/agro-analytics.service';
 import type { AgroReportResult } from '../services/agro-analytics.service';
@@ -104,12 +106,13 @@ const MetricCard = ({ label, value, unit, helpText, trend, icon, color = "brand.
         {icon && <Icon as={icon} color={color} w={4} h={4} />}
         </HStack>
         <Stat>
-        <StatNumber 
-            fontSize="2xl" 
-            fontWeight="bold" 
-            bgGradient="linear(to-b, brand.orange, orange.300)" 
+        <StatNumber
+            fontSize="2xl"
+            fontWeight="700"
+            fontFamily="'JetBrains Mono', monospace"
+            bgGradient="linear(to-b, brand.orange, orange.300)"
             bgClip="text"
-            color="transparent" // Fallback
+            color="transparent"
         >
             {value}
             {unit && <Text as="span" fontSize="sm" color="gray.500" ml={1} display="inline-block" style={{ WebkitTextFillColor: 'initial' }}>{unit}</Text>}
@@ -125,6 +128,16 @@ const MetricCard = ({ label, value, unit, helpText, trend, icon, color = "brand.
 );
 
 // Constantes de Cultivos
+const slideInFromLeft = keyframes`
+  from { opacity: 0; transform: translateX(-14px) translateY(6px); }
+  to   { opacity: 1; transform: translateX(0)     translateY(0);   }
+`;
+
+const slideInFromRight = keyframes`
+  from { opacity: 0; transform: translateX(14px) translateY(6px); }
+  to   { opacity: 1; transform: translateX(0)    translateY(0);   }
+`;
+
 const CROPS = [
     { name: 'Maíz', base: 10, max: 30 },
     { name: 'Trigo', base: 5, max: 25 },
@@ -158,6 +171,7 @@ interface PersistedAgroReportState {
   currentReport: AgroReportResult | null;
   isMobileFiltersOpen: boolean;
   showCustomInputs?: boolean;
+  reportCropName?: string; // cultivo con el que se generó el reporte activo
 }
 
 const AGRO_REPORT_SESSION_KEY = 'agro_report_session_v1';
@@ -197,6 +211,7 @@ export const AgroReportPage = () => {
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [currentReport, setCurrentReport] = useState<AgroReportResult | null>(persistedState?.currentReport ?? null);
+  const [reportCropName, setReportCropName] = useState<string | undefined>(persistedState?.reportCropName);
   const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(persistedState?.isMobileFiltersOpen ?? false);
   const [showCustomInputs, setShowCustomInputs] = useState(
     persistedState?.showCustomInputs ?? (persistedState?.selectedCrop === 'Personalizado')
@@ -281,6 +296,7 @@ export const AgroReportPage = () => {
       currentReport,
       isMobileFiltersOpen,
       showCustomInputs,
+      reportCropName,
     };
 
     window.sessionStorage.setItem(AGRO_REPORT_SESSION_KEY, JSON.stringify(payload));
@@ -334,9 +350,11 @@ export const AgroReportPage = () => {
         endDate,
         cropBaseTemp: baseTemp,
         cropMaxTemp: maxTemp,
+        cropName: selectedCrop !== 'Personalizado' ? selectedCrop : undefined,
       });
 
       setCurrentReport(data);
+      setReportCropName(selectedCrop !== 'Personalizado' ? selectedCrop : undefined);
       setIsMobileFiltersOpen(false);
 
       // Replace loading message with actual report
@@ -371,6 +389,7 @@ export const AgroReportPage = () => {
 
     const question = inputText;
     setInputText('');
+    onCloseChatModal();
     setIsSendingMessage(true);
 
     // Add user message
@@ -381,7 +400,14 @@ export const AgroReportPage = () => {
     setMessages(prev => [...prev, { id: loadingId, role: 'assistant', isLoading: true }]);
 
     try {
-        const answer = await agroAnalyticsService.chatWithReport(question, currentReport);
+        const history = messages
+          .filter(m => !m.isLoading && m.content && m.id !== 1)
+          .map(m => ({ role: m.role, content: m.content! }));
+
+        const answer = await agroAnalyticsService.chatWithReport(question, {
+          ...currentReport,
+          cropName: reportCropName,
+        }, history);
         
         // Replace loading with answer
         setMessages(prev => prev.filter(m => m.id !== loadingId).concat({
@@ -397,7 +423,6 @@ export const AgroReportPage = () => {
         }));
     } finally {
         setIsSendingMessage(false);
-        onCloseChatModal();
     }
   };
 
@@ -432,14 +457,18 @@ export const AgroReportPage = () => {
         {messages.length === 0 && (
             <VStack spacing={8} py={20} opacity={0.8} align="center" justify="center" minH="50vh">
                 <Icon as={FiCpu} w={20} h={20} color="brand.orange" />
-                <Heading 
-                    as="h1" 
-                    size="2xl" 
-                    bgGradient="linear(to-r, brand.orange, brand.orangeLight)" 
-                    bgClip="text"
+                <Heading
+                    as="h1"
+                    size="2xl"
+                    fontWeight="300"
+                    letterSpacing="-0.02em"
+                    color="white"
                     textAlign="center"
                 >
-                    Bienvenido a AgroReport AI
+                    Bienvenido a{' '}
+                    <Text as="span" fontStyle="italic" bgGradient="linear(to-r, #ffbc86, #e8722a)" bgClip="text">
+                      AgroReport AI
+                    </Text>
                 </Heading>
                 <Text fontSize="xl" color="gray.400" textAlign="center" maxW="600px">
                     Tu asistente inteligente para agricultura de precisión. <br />
@@ -448,7 +477,11 @@ export const AgroReportPage = () => {
             </VStack>
         )}
         {messages.map((msg) => (
-            <Flex key={msg.id} justify={msg.role === 'user' ? 'flex-end' : 'flex-start'}>
+            <Flex
+              key={msg.id}
+              justify={msg.role === 'user' ? 'flex-end' : 'flex-start'}
+              animation={`${msg.role === 'user' ? slideInFromRight : slideInFromLeft} 0.28s ease-out both`}
+            >
                 <HStack align="start" maxW={msg.role === 'user' ? '80%' : '90%'} spacing={3}>
                     {msg.role === 'assistant' && (
                         <Avatar size="sm" icon={<FiCpu />} bg="green.500" />
@@ -642,6 +675,51 @@ export const AgroReportPage = () => {
             gap={2}
             direction="column"
         >
+            {/* Context header — visible only when a report is active */}
+            {currentReport && (
+              <HStack
+                px={3}
+                py={1.5}
+                spacing={3}
+                borderRadius="2xl"
+                bg="rgba(255,129,68,0.07)"
+                border="1px solid rgba(255,129,68,0.18)"
+                justify="space-between"
+                flexWrap="wrap"
+                gap={1}
+              >
+                <HStack spacing={2}>
+                  <Icon as={FiCpu} color="rgba(255,129,68,0.7)" boxSize={3} />
+                  <Text
+                    fontFamily="'JetBrains Mono', monospace"
+                    fontSize="10px"
+                    fontWeight="700"
+                    color="rgba(255,129,68,0.5)"
+                    letterSpacing="0.1em"
+                    textTransform="uppercase"
+                  >
+                    Contexto activo
+                  </Text>
+                </HStack>
+                <HStack spacing={3} flexWrap="wrap" gap={1}>
+                  {reportCropName && (
+                    <HStack spacing={1}>
+                      <Box w="5px" h="5px" borderRadius="full" bg="rgba(255,129,68,0.6)" />
+                      <Text fontSize="xs" color="rgba(255,255,255,0.75)" fontWeight="500">
+                        {reportCropName}
+                      </Text>
+                    </HStack>
+                  )}
+                  <HStack spacing={1}>
+                    <Icon as={FiCalendar} color="rgba(255,129,68,0.5)" boxSize={3} />
+                    <Text fontSize="xs" color="rgba(255,255,255,0.55)" fontFamily="'JetBrains Mono', monospace">
+                      {currentReport.period.startDate} → {currentReport.period.endDate}
+                    </Text>
+                  </HStack>
+                </HStack>
+              </HStack>
+            )}
+
             <Flex
                 w="full"
                 align={{ base: "stretch", md: "center" }}

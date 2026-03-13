@@ -8,8 +8,9 @@ const config: ThemeConfig = {
 const theme = extendTheme({
   config,
   fonts: {
-    heading: `'Inter', -apple-system, BlinkMacSystemFont, sans-serif`,
-    body: `'Inter', -apple-system, BlinkMacSystemFont, sans-serif`,
+    heading: `'Fraunces', Georgia, 'Times New Roman', serif`,
+    body: `system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`,
+    mono: `'JetBrains Mono', 'Fira Code', 'Courier New', monospace`,
   },
   colors: {
     brand: {
