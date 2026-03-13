@@ -7,6 +7,7 @@ import { Footer } from './components/Footer';
 import { InfoPage } from './components/InfoPage';
 import { ParticleBackground } from './components/ParticleBackground';
 import { AgroReportPage } from './components/AgroReportPage';
+import { FeedbackWidget } from './components/FeedbackWidget';
 
 const ACTIVE_PAGE_SESSION_KEY = 'active_page_session_v1';
 
@@ -35,6 +36,7 @@ function App() {
   }, [activePage]);
 
   return (
+    <>
     <Box minH="100vh" position="relative" isolation="isolate">
       <ParticleBackground />
 
@@ -68,6 +70,8 @@ function App() {
         {activePage !== 'Reporte IA' && <Footer />}
       </Box>
     </Box>
+    <FeedbackWidget />
+    </>
   );
 }
 

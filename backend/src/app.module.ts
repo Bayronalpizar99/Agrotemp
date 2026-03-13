@@ -7,6 +7,7 @@ import { FirebaseModule } from './modules/firebase/firebase.module';
 import { AppController } from './app.controller';
 import { ExcelModule } from './excel/excel.module';
 import { AgroAnalyticsModule } from './modules/agro-analytics/agro-analytics.module';
+import { FeedbackModule } from './modules/feedback/feedback.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { AgroAnalyticsModule } from './modules/agro-analytics/agro-analytics.mod
     WeatherModule,
     ExcelModule,
     AgroAnalyticsModule,
+    FeedbackModule,
   ],
   controllers: [AppController],
 })
