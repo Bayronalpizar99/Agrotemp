@@ -112,7 +112,7 @@ export function FeedbackWidget({ activePage }: { activePage: string }) {
         position="fixed"
         right={0}
         top={0}
-        h="100vh"
+        sx={{ height: '100dvh' }}
         w={{ base: '100vw', sm: '340px' }}
         zIndex={901}
         transform={isOpen ? 'translateX(0)' : 'translateX(100%)'}
@@ -222,7 +222,7 @@ export function FeedbackWidget({ activePage }: { activePage: string }) {
                 onChange={(e) => setComment(e.target.value.slice(0, 500))}
                 placeholder="Escribe tu comentario aquí..."
                 size="sm"
-                rows={6}
+                rows={4}
                 resize="none"
                 bg="rgba(255,255,255,0.04)"
                 border="1px solid rgba(255,255,255,0.1)"
