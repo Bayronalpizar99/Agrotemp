@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client'
 import { ChakraProvider } from '@chakra-ui/react'
 import App from './App.tsx'
 import theme from './theme' // Importa tu tema
+import 'leaflet/dist/leaflet.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

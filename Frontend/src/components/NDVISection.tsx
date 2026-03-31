@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   Box,
   SimpleGrid,
@@ -9,8 +10,11 @@ import {
   StatNumber,
   StatHelpText,
   StatArrow,
+  Button,
+  Spinner,
+  Image,
 } from '@chakra-ui/react';
-import { FiActivity, FiTrendingUp, FiTrendingDown, FiMinus, FiLayers } from 'react-icons/fi';
+import { FiActivity, FiTrendingUp, FiTrendingDown, FiMinus, FiLayers, FiMap, FiChevronDown, FiChevronUp } from 'react-icons/fi';
 import {
   ResponsiveContainer,
   AreaChart,
@@ -23,12 +27,24 @@ import {
 } from 'recharts';
 import type { NDVIResult } from '../services/satellite.service';
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
 const NDVI_ZONES = [
   { max: 0.2, label: 'Suelo', color: '#a1887f' },
   { max: 0.4, label: 'Escasa', color: '#e6a23c' },
   { max: 0.6, label: 'Moderada', color: '#8bc34a' },
   { max: 0.8, label: 'Densa', color: '#43a047' },
   { max: 1.0, label: 'Muy densa', color: '#1b5e20' },
+];
+
+// Color legend matching the evalscript palette
+const IMAGE_LEGEND = [
+  { color: '#6495ed', label: 'Agua / nube' },
+  { color: '#a1887f', label: 'Suelo desnudo' },
+  { color: '#e6a23c', label: 'Veg. escasa' },
+  { color: '#8bc34a', label: 'Veg. moderada' },
+  { color: '#43a047', label: 'Veg. densa' },
+  { color: '#1b5e20', label: 'Veg. muy densa' },
 ];
 
 function getClassColor(avgNDVI: number): string {
@@ -70,8 +86,22 @@ interface NDVISectionProps {
 }
 
 export function NDVISection({ data }: NDVISectionProps) {
-  const { summary, timeSeries } = data;
+  const { summary, timeSeries, bbox, period } = data;
   const classColor = getClassColor(summary.avgNDVI);
+
+  const [showImage, setShowImage] = useState(false);
+  const [imageLoading, setImageLoading] = useState(false);
+  const [imageError, setImageError] = useState(false);
+
+  const imageUrl = `${API_BASE}/satellite/ndvi-image?bbox=${bbox.join(',')}&from=${period.from}&to=${period.to}`;
+
+  function handleToggleImage() {
+    if (!showImage) {
+      setImageLoading(true);
+      setImageError(false);
+    }
+    setShowImage((v) => !v);
+  }
 
   return (
     <VStack spacing={4} align="stretch" w="full">
@@ -208,11 +238,9 @@ export function NDVISection({ data }: NDVISectionProps) {
                       return [value.toFixed(3), labels[name] || name];
                     }}
                   />
-                  {/* Zone reference lines */}
                   <ReferenceLine y={0.2} stroke="#a1887f" strokeDasharray="3 3" strokeOpacity={0.4} />
                   <ReferenceLine y={0.4} stroke="#e6a23c" strokeDasharray="3 3" strokeOpacity={0.4} />
                   <ReferenceLine y={0.6} stroke="#8bc34a" strokeDasharray="3 3" strokeOpacity={0.4} />
-
                   <Area
                     type="monotone"
                     dataKey="mean"
@@ -244,7 +272,7 @@ export function NDVISection({ data }: NDVISectionProps) {
               </ResponsiveContainer>
             </Box>
 
-            {/* Legend */}
+            {/* Chart legend */}
             <HStack spacing={4} mt={3} justify="center" flexWrap="wrap">
               {NDVI_ZONES.map((zone) => (
                 <HStack key={zone.label} spacing={1.5}>
@@ -258,6 +286,96 @@ export function NDVISection({ data }: NDVISectionProps) {
           </Box>
         </Box>
       )}
+
+      {/* Satellite image toggle */}
+      <Box
+        p="1px"
+        borderRadius="xl"
+        bgGradient="linear(to-b, rgba(67, 160, 71, 0.2), rgba(255, 255, 255, 0.05))"
+      >
+        <Box bg="#1A1A1A" borderRadius="xl" overflow="hidden">
+          <Button
+            w="full"
+            variant="ghost"
+            size="sm"
+            py={4}
+            borderRadius="xl"
+            onClick={handleToggleImage}
+            leftIcon={<Icon as={FiMap} color="#43a047" />}
+            rightIcon={<Icon as={showImage ? FiChevronUp : FiChevronDown} color="gray.500" />}
+            justifyContent="space-between"
+            _hover={{ bg: 'rgba(67,160,71,0.08)' }}
+            color="gray.300"
+            fontWeight="bold"
+            fontSize="xs"
+            textTransform="uppercase"
+            letterSpacing="wide"
+            px={4}
+          >
+            Imagen satelital Sentinel-2 — Visualización NDVI
+          </Button>
+
+          {showImage && (
+            <Box px={4} pb={4}>
+              {/* Loading */}
+              {imageLoading && !imageError && (
+                <HStack justify="center" py={8} spacing={3}>
+                  <Spinner size="sm" color="#43a047" />
+                  <Text fontSize="xs" color="gray.500">
+                    Descargando imagen del satélite...
+                  </Text>
+                </HStack>
+              )}
+
+              {/* Error */}
+              {imageError && (
+                <Box
+                  py={6}
+                  textAlign="center"
+                  borderRadius="lg"
+                  bg="rgba(229,62,62,0.08)"
+                  border="1px solid rgba(229,62,62,0.2)"
+                >
+                  <Text fontSize="xs" color="red.400">
+                    No se pudo cargar la imagen. Es posible que no haya imágenes disponibles para este periodo.
+                  </Text>
+                </Box>
+              )}
+
+              {/* Image */}
+              <Box position="relative">
+                <Image
+                  src={imageUrl}
+                  alt="Imagen NDVI Sentinel-2"
+                  borderRadius="lg"
+                  w="full"
+                  display={imageLoading || imageError ? 'none' : 'block'}
+                  onLoad={() => setImageLoading(false)}
+                  onError={() => { setImageLoading(false); setImageError(true); }}
+                  style={{ imageRendering: 'pixelated' }}
+                />
+              </Box>
+
+              {/* Image legend */}
+              {!imageLoading && !imageError && (
+                <>
+                  <HStack spacing={3} mt={3} justify="center" flexWrap="wrap">
+                    {IMAGE_LEGEND.map((item) => (
+                      <HStack key={item.label} spacing={1.5}>
+                        <Box w={2.5} h={2.5} borderRadius="sm" bg={item.color} flexShrink={0} />
+                        <Text fontSize="xs" color="gray.500">{item.label}</Text>
+                      </HStack>
+                    ))}
+                  </HStack>
+                  <Text fontSize="10px" color="gray.600" textAlign="center" mt={2}>
+                    Mosaico de menor nubosidad — {period.from} a {period.to} · Sentinel-2 L2A · Copernicus Data Space
+                  </Text>
+                </>
+              )}
+            </Box>
+          )}
+        </Box>
+      </Box>
     </VStack>
   );
 }

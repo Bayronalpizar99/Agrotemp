@@ -224,6 +224,7 @@ export const Header = ({ isVisible, activePage, setActivePage }: HeaderProps) =>
       <HStack spacing={4} display={{ base: "none", md: "flex" }}>
         <NavLink name="Reporte IA" activePage={activePage} setActivePage={setActivePage} />
         <NavLink name="Dashboard" activePage={activePage} setActivePage={setActivePage} />
+        <NavLink name="Parcelas" activePage={activePage} setActivePage={setActivePage} />
         <NavLink name="Info" activePage={activePage} setActivePage={setActivePage} />
         
         <Button
@@ -270,6 +271,14 @@ export const Header = ({ isVisible, activePage, setActivePage }: HeaderProps) =>
               onClick={() => setActivePage('Dashboard')}
             >
               Dashboard
+            </MenuItem>
+            <MenuItem
+              bg="transparent"
+              color="white"
+              _hover={{ bg: 'whiteAlpha.200' }}
+              onClick={() => setActivePage('Parcelas')}
+            >
+              Parcelas
             </MenuItem>
             <MenuItem
               bg="transparent"

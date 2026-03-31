@@ -25,6 +25,46 @@ function evaluatePixel(sample) {
 
 const TOKEN_URL = 'https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token';
 const STATS_URL = 'https://sh.dataspace.copernicus.eu/api/v1/statistics';
+const PROCESS_URL = 'https://sh.dataspace.copernicus.eu/api/v1/process';
+
+const TRUE_COLOR_EVALSCRIPT = `
+//VERSION=3
+function setup() {
+  return {
+    input: [{ bands: ["B04", "B03", "B02"], units: "REFLECTANCE" }],
+    output: { bands: 3, sampleType: "UINT8" }
+  };
+}
+
+function evaluatePixel(sample) {
+  const gain = 3.5;
+  return [
+    Math.min(255, Math.round(sample.B04 * gain * 255)),
+    Math.min(255, Math.round(sample.B03 * gain * 255)),
+    Math.min(255, Math.round(sample.B02 * gain * 255)),
+  ];
+}
+`;
+
+const NDVI_IMAGE_EVALSCRIPT = `
+//VERSION=3
+function setup() {
+  return {
+    input: [{ bands: ["B04", "B08"], units: "REFLECTANCE" }],
+    output: { bands: 3, sampleType: "UINT8" }
+  };
+}
+
+function evaluatePixel(sample) {
+  const ndvi = (sample.B08 - sample.B04) / (sample.B08 + sample.B04);
+  if (ndvi < 0)   return [100, 149, 237]; // agua / nube
+  if (ndvi < 0.2) return [161, 136, 127]; // suelo desnudo
+  if (ndvi < 0.4) return [230, 162,  60]; // vegetación escasa
+  if (ndvi < 0.6) return [139, 195,  74]; // vegetación moderada
+  if (ndvi < 0.8) return [ 67, 160,  71]; // vegetación densa
+  return [27, 94, 32];                     // vegetación muy densa
+}
+`;
 
 @Injectable()
 export class SatelliteService {
@@ -175,6 +215,62 @@ export class SatelliteService {
       timeSeries,
       summary: { avgNDVI, minNDVI, maxNDVI, classification, trend },
     };
+  }
+
+  async getTrueColorImage(bbox: number[], from: string, to: string): Promise<Buffer> {
+    return this.fetchProcessImage(bbox, from, to, TRUE_COLOR_EVALSCRIPT);
+  }
+
+  async getNDVIImage(bbox: number[], from: string, to: string): Promise<Buffer> {
+    return this.fetchProcessImage(bbox, from, to, NDVI_IMAGE_EVALSCRIPT);
+  }
+
+  private async fetchProcessImage(bbox: number[], from: string, to: string, evalscript: string): Promise<Buffer> {
+    const token = await this.getToken();
+
+    const body = {
+      input: {
+        bounds: {
+          bbox,
+          properties: { crs: 'http://www.opengis.net/def/crs/EPSG/0/4326' },
+        },
+        data: [
+          {
+            type: 'S2L2A',
+            dataFilter: {
+              timeRange: { from: `${from}T00:00:00Z`, to: `${to}T23:59:59Z` },
+              maxCloudCoverage: 80,
+              mosaickingOrder: 'leastCC',
+            },
+          },
+        ],
+      },
+      output: {
+        width: 768,
+        height: 768,
+        responses: [{ identifier: 'default', format: { type: 'image/png' } }],
+      },
+      evalscript,
+    };
+
+    const res = await fetch(PROCESS_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        Accept: 'image/png',
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      this.logger.error(`Process API error (${res.status}): ${text}`);
+      throw new Error(`Error al obtener imagen satelital (${res.status}): ${text}`);
+    }
+
+    const arrayBuffer = await res.arrayBuffer();
+    return Buffer.from(arrayBuffer);
   }
 
   private classifyNDVI(value: number): string {

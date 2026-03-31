@@ -8,6 +8,7 @@ import { InfoPage } from './components/InfoPage';
 import { ParticleBackground } from './components/ParticleBackground';
 import { AgroReportPage } from './components/AgroReportPage';
 import { FeedbackWidget } from './components/FeedbackWidget';
+import { ParcelasPage } from './components/ParcelasPage';
 
 const ACTIVE_PAGE_SESSION_KEY = 'active_page_session_v1';
 
@@ -64,6 +65,9 @@ function App() {
           </Box>
           <Box display={activePage === 'Info' ? 'block' : 'none'}>
             <InfoPage />
+          </Box>
+          <Box display={activePage === 'Parcelas' ? 'block' : 'none'}>
+            <ParcelasPage />
           </Box>
         </Container>
 
