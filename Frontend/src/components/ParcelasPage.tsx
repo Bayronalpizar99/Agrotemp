@@ -13,7 +13,7 @@ import {
 } from '@chakra-ui/react';
 import { MapContainer, TileLayer, ImageOverlay, useMapEvents, useMap, Polygon } from 'react-leaflet';
 import { FiAlertCircle, FiEdit2, FiX, FiTrash2 } from 'react-icons/fi';
-import L from 'leaflet';
+import * as L from 'leaflet';
 import type { LatLngBoundsExpression } from 'leaflet';
 import { satelliteService } from '../services/satellite.service';
 import type { NDVIResult } from '../services/satellite.service';
