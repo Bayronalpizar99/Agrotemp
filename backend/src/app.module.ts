@@ -8,6 +8,7 @@ import { AppController } from './app.controller';
 import { ExcelModule } from './excel/excel.module';
 import { AgroAnalyticsModule } from './modules/agro-analytics/agro-analytics.module';
 import { FeedbackModule } from './modules/feedback/feedback.module';
+import { SatelliteModule } from './modules/satellite/satellite.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { FeedbackModule } from './modules/feedback/feedback.module';
     ExcelModule,
     AgroAnalyticsModule,
     FeedbackModule,
+    SatelliteModule,
   ],
   controllers: [AppController],
 })
