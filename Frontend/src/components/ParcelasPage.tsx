@@ -23,6 +23,11 @@ const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
 
 const ITCR_CENTER: [number, number] = [10.364214, -84.507275];
 const CAMPUS_BBOX = [-84.5220, 10.3550, -84.5050, 10.3720];
+// Bounds ligeramente más grandes para que el usuario pueda hacer scroll suave en los bordes
+const CAMPUS_MAX_BOUNDS: [[number, number], [number, number]] = [
+  [CAMPUS_BBOX[1] - 0.012, CAMPUS_BBOX[0] - 0.012],
+  [CAMPUS_BBOX[3] + 0.012, CAMPUS_BBOX[2] + 0.012],
+];
 
 type LayerMode = 'ndvi' | 'true-color';
 
@@ -46,6 +51,19 @@ function MapResizer({ isActive }: { isActive: boolean }) {
       setTimeout(() => map.invalidateSize(), 100);
     }
   }, [isActive, map]);
+  return null;
+}
+
+function MapBoundsController({ isNdvi }: { isNdvi: boolean }) {
+  const map = useMap();
+  useEffect(() => {
+    if (isNdvi) {
+      map.fitBounds(bboxToBounds(CAMPUS_BBOX), { padding: [40, 40], animate: true });
+      map.setMaxBounds(CAMPUS_MAX_BOUNDS);
+    } else {
+      map.setMaxBounds(null as unknown as LatLngBoundsExpression);
+    }
+  }, [isNdvi, map]);
   return null;
 }
 
@@ -128,6 +146,7 @@ export function ParcelasPage({ isActive = false }: { isActive?: boolean }) {
   }, [layerMode, from, to]);
 
   const handleViewportChange = useCallback((bbox: number[]) => {
+    if (layerModeRef.current === 'ndvi') return; // NDVI siempre usa CAMPUS_BBOX fijo
     fetchOverlay(bbox);
   }, [fetchOverlay]);
 
@@ -411,6 +430,7 @@ export function ParcelasPage({ isActive = false }: { isActive?: boolean }) {
           style={{ height: '76vh', width: '100%', background: '#080808' }}
         >
           <MapResizer isActive={isActive} />
+          <MapBoundsController isNdvi={isNdvi} />
           <MapEventHandler onViewportChange={handleViewportChange} />
 
           <TileLayer
