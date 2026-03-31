@@ -11,7 +11,7 @@ import {
   Spinner,
   Icon,
 } from '@chakra-ui/react';
-import { MapContainer, TileLayer, ImageOverlay, useMapEvents, useMap, Polygon } from 'react-leaflet';
+import { MapContainer, TileLayer, useMapEvents, useMap, Polygon } from 'react-leaflet';
 import { FiAlertCircle, FiEdit2, FiX, FiTrash2 } from 'react-icons/fi';
 import * as L from 'leaflet';
 import type { LatLngBoundsExpression } from 'leaflet';
@@ -47,6 +47,66 @@ const NDVI_LEGEND = [
 ];
 
 // ── Componentes internos del mapa ─────────────────────────────────────────────
+
+/**
+ * Muestra la imagen NDVI recortada al polígono dibujado usando CSS clip-path.
+ * La imagen del backend cubre el bbox completo (rectángulo), pero clip-path
+ * la recorta visualmente al polígono exacto sin modificar el backend.
+ */
+function ClippedImageOverlay({
+  url,
+  bbox,
+  opacity,
+  clipLatlngs,
+}: {
+  url: string;
+  bbox: number[];
+  opacity: number;
+  clipLatlngs: [number, number][] | null;
+}) {
+  const map = useMap();
+  const overlayRef = useRef<L.ImageOverlay | null>(null);
+  const clipRef = useRef(clipLatlngs);
+  const bboxRef = useRef(bbox);
+
+  useEffect(() => { clipRef.current = clipLatlngs; }, [clipLatlngs]);
+  useEffect(() => { bboxRef.current = bbox; }, [bbox]);
+
+  const applyClip = useCallback((img: HTMLElement) => {
+    const clip = clipRef.current;
+    const b = bboxRef.current; // [west, south, east, north]
+    if (!clip || clip.length < 3) { img.style.clipPath = ''; return; }
+    const [minLng, minLat, maxLng, maxLat] = b;
+    const pts = clip.map(([lat, lng]) => {
+      const x = ((lng - minLng) / (maxLng - minLng) * 100).toFixed(2);
+      const y = ((maxLat - lat) / (maxLat - minLat) * 100).toFixed(2);
+      return `${x}% ${y}%`;
+    }).join(', ');
+    img.style.clipPath = `polygon(${pts})`;
+  }, []);
+
+  useEffect(() => {
+    if (!url) return;
+    if (overlayRef.current) { map.removeLayer(overlayRef.current); overlayRef.current = null; }
+    const overlay = L.imageOverlay(url, bboxToBounds(bbox) as L.LatLngBoundsExpression);
+    overlay.addTo(map);
+    overlayRef.current = overlay;
+    const tryApply = () => { const img = overlay.getElement(); if (img) applyClip(img); };
+    overlay.once('load', tryApply);
+    tryApply();
+    return () => { map.removeLayer(overlay); if (overlayRef.current === overlay) overlayRef.current = null; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url, map]);
+
+  useEffect(() => { overlayRef.current?.setOpacity(opacity); }, [opacity]);
+
+  useEffect(() => {
+    const img = overlayRef.current?.getElement();
+    if (img) applyClip(img);
+  }, [clipLatlngs, applyClip]);
+
+  return null;
+}
 
 function MapResizer({ isActive }: { isActive: boolean }) {
   const map = useMap();
@@ -646,8 +706,11 @@ export function ParcelasPage({ isActive = false }: { isActive?: boolean }) {
           )}
 
           {overlayUrl && (
-            <ImageOverlay key={overlayUrl} url={overlayUrl}
-              bounds={bboxToBounds(overlayBounds)} opacity={opacity}
+            <ClippedImageOverlay
+              url={overlayUrl}
+              bbox={overlayBounds}
+              opacity={opacity}
+              clipLatlngs={drawnSelection?.latlngs ?? null}
             />
           )}
         </MapContainer>
