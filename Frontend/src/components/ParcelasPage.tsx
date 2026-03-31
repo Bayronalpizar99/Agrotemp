@@ -11,8 +11,9 @@ import {
   Spinner,
   Icon,
 } from '@chakra-ui/react';
-import { MapContainer, TileLayer, ImageOverlay, useMapEvents, useMap } from 'react-leaflet';
-import { FiAlertCircle } from 'react-icons/fi';
+import { MapContainer, TileLayer, ImageOverlay, useMapEvents, useMap, Rectangle } from 'react-leaflet';
+import { FiAlertCircle, FiSquare, FiX, FiTrash2 } from 'react-icons/fi';
+import L from 'leaflet';
 import type { LatLngBoundsExpression } from 'leaflet';
 import { satelliteService } from '../services/satellite.service';
 import type { NDVIResult } from '../services/satellite.service';
@@ -23,11 +24,6 @@ const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
 
 const ITCR_CENTER: [number, number] = [10.364214, -84.507275];
 const CAMPUS_BBOX = [-84.5220, 10.3550, -84.5050, 10.3720];
-// Bounds ligeramente más grandes para que el usuario pueda hacer scroll suave en los bordes
-const CAMPUS_MAX_BOUNDS: [[number, number], [number, number]] = [
-  [CAMPUS_BBOX[1] - 0.012, CAMPUS_BBOX[0] - 0.012],
-  [CAMPUS_BBOX[3] + 0.012, CAMPUS_BBOX[2] + 0.012],
-];
 
 type LayerMode = 'ndvi' | 'true-color';
 
@@ -59,12 +55,83 @@ function MapBoundsController({ isNdvi }: { isNdvi: boolean }) {
   useEffect(() => {
     if (isNdvi) {
       map.fitBounds(bboxToBounds(CAMPUS_BBOX), { padding: [40, 40], animate: true });
-      map.setMaxBounds(CAMPUS_MAX_BOUNDS);
-    } else {
-      map.setMaxBounds(null as unknown as LatLngBoundsExpression);
     }
   }, [isNdvi, map]);
   return null;
+}
+
+function DrawRectangle({
+  active,
+  onComplete,
+}: {
+  active: boolean;
+  onComplete: (bbox: number[]) => void;
+}) {
+  const map = useMap();
+  const startRef = useRef<L.LatLng | null>(null);
+  const tempRectRef = useRef<L.Rectangle | null>(null);
+
+  useEffect(() => {
+    if (!active) return;
+
+    const container = map.getContainer();
+    map.dragging.disable();
+    container.style.cursor = 'crosshair';
+
+    const onMouseDown = (e: L.LeafletMouseEvent) => {
+      startRef.current = e.latlng;
+      if (tempRectRef.current) { map.removeLayer(tempRectRef.current); tempRectRef.current = null; }
+      tempRectRef.current = L.rectangle([e.latlng, e.latlng], {
+        color: '#ff8a50', weight: 1.5, dashArray: '5 4',
+        fillColor: '#ff8a50', fillOpacity: 0.06, interactive: false,
+      }).addTo(map);
+    };
+
+    const onMouseMove = (e: L.LeafletMouseEvent) => {
+      if (!startRef.current || !tempRectRef.current) return;
+      tempRectRef.current.setBounds(L.latLngBounds(startRef.current, e.latlng));
+    };
+
+    const onMouseUp = (e: L.LeafletMouseEvent) => {
+      if (!startRef.current) return;
+      const bounds = L.latLngBounds(startRef.current, e.latlng);
+      if (tempRectRef.current) { map.removeLayer(tempRectRef.current); tempRectRef.current = null; }
+      startRef.current = null;
+      const latDiff = Math.abs(bounds.getNorth() - bounds.getSouth());
+      const lngDiff = Math.abs(bounds.getEast() - bounds.getWest());
+      if (latDiff < 0.0005 || lngDiff < 0.0005) return; // demasiado pequeño, ignorar
+      const bbox = [bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()];
+      onComplete(bbox);
+    };
+
+    map.on('mousedown', onMouseDown);
+    map.on('mousemove', onMouseMove);
+    map.on('mouseup', onMouseUp);
+
+    return () => {
+      map.off('mousedown', onMouseDown);
+      map.off('mousemove', onMouseMove);
+      map.off('mouseup', onMouseUp);
+      map.dragging.enable();
+      container.style.cursor = '';
+      if (tempRectRef.current) { map.removeLayer(tempRectRef.current); tempRectRef.current = null; }
+    };
+  }, [active, map, onComplete]);
+
+  return null;
+}
+
+function SelectionRect({ bbox }: { bbox: number[] | null }) {
+  if (!bbox) return null;
+  return (
+    <Rectangle
+      bounds={bboxToBounds(bbox) as [[number, number], [number, number]]}
+      pathOptions={{
+        color: '#ff8a50', weight: 2, dashArray: '6 4',
+        fillColor: '#ff8a50', fillOpacity: 0.06, interactive: false,
+      }}
+    />
+  );
 }
 
 function MapEventHandler({ onViewportChange }: { onViewportChange: (bbox: number[]) => void }) {
@@ -97,6 +164,9 @@ export function ParcelasPage({ isActive = false }: { isActive?: boolean }) {
 
   const [ndviStats, setNdviStats] = useState<NDVIResult | null>(null);
   const [ndviStatsLoading, setNdviStatsLoading] = useState(false);
+
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [drawnBbox, setDrawnBbox] = useState<number[] | null>(null);
 
   const fromRef = useRef(from);
   const toRef = useRef(to);
@@ -131,38 +201,49 @@ export function ParcelasPage({ isActive = false }: { isActive?: boolean }) {
     }
   }, []);
 
+  // Fetch NDVI stats cuando cambia el área seleccionada, fechas o modo
   useEffect(() => {
-    fetchOverlay(CAMPUS_BBOX);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    if (layerMode !== 'ndvi') return;
+    if (layerMode !== 'ndvi' || !drawnBbox) return;
     setNdviStatsLoading(true);
-    satelliteService.getNDVI(CAMPUS_BBOX, from, to)
+    satelliteService.getNDVI(drawnBbox, from, to)
       .then((result) => { setNdviStats(result); })
       .catch(() => { setNdviStats(null); })
       .finally(() => { setNdviStatsLoading(false); });
-  }, [layerMode, from, to]);
+  }, [layerMode, from, to, drawnBbox]);
 
   const handleViewportChange = useCallback((bbox: number[]) => {
-    if (layerModeRef.current === 'ndvi') return; // NDVI siempre usa CAMPUS_BBOX fijo
+    if (layerModeRef.current === 'ndvi') return;
     fetchOverlay(bbox);
   }, [fetchOverlay]);
 
   const handleApply = useCallback(() => {
-    fetchOverlay(overlayBounds);
-  }, [fetchOverlay, overlayBounds]);
+    if (drawnBbox) fetchOverlay(drawnBbox);
+  }, [fetchOverlay, drawnBbox]);
+
+  const handleDrawComplete = useCallback((bbox: number[]) => {
+    setIsDrawing(false);
+    setDrawnBbox(bbox);
+    fetchOverlay(bbox);
+  }, [fetchOverlay]);
+
+  const handleClearSelection = useCallback(() => {
+    setDrawnBbox(null);
+    setOverlayUrl('');
+    setOverlayBounds(CAMPUS_BBOX);
+    setNdviStats(null);
+    setImageError(false);
+  }, []);
 
   const handleLayerChange = (mode: LayerMode) => {
     layerModeRef.current = mode;
     setLayerMode(mode);
-    if (mode === 'ndvi') {
-      fetchOverlay(overlayBounds);
-    } else {
+    if (mode !== 'ndvi') {
       setOverlayUrl('');
       setImageLoading(false);
       setImageError(false);
+      setDrawnBbox(null);
+      setIsDrawing(false);
+      setNdviStats(null);
     }
   };
 
@@ -271,9 +352,103 @@ export function ParcelasPage({ isActive = false }: { isActive?: boolean }) {
             {/* NDVI controls */}
             {isNdvi && (
               <>
+                {/* ── Herramienta de dibujo ───────── */}
+                <Box borderTop="1px solid rgba(255,255,255,0.05)" px={3} py={3}>
+
+                  {/* Sin selección, no dibujando */}
+                  {!drawnBbox && !isDrawing && (
+                    <VStack spacing={2} align="stretch">
+                      <Text fontSize="9px" color="rgba(255,255,255,0.2)" textTransform="uppercase" letterSpacing="0.1em">
+                        Área de análisis
+                      </Text>
+                      <Text fontSize="9px" color="rgba(255,255,255,0.3)" lineHeight="1.5">
+                        Dibuja un área en el mapa para analizar su NDVI
+                      </Text>
+                      <Box
+                        as="button" w="full" py={1.5} borderRadius="md"
+                        bg="rgba(255,138,80,0.18)"
+                        border="1px solid rgba(255,138,80,0.35)"
+                        color="#ff8a50" fontSize="10px" fontWeight="700"
+                        letterSpacing="0.1em" textTransform="uppercase"
+                        cursor="pointer"
+                        onClick={() => setIsDrawing(true)}
+                        transition="all 0.15s"
+                        _hover={{ bg: 'rgba(255,138,80,0.28)', borderColor: 'rgba(255,138,80,0.55)' }}
+                        display="flex" alignItems="center" justifyContent="center" gap="5px"
+                      >
+                        <Icon as={FiSquare} boxSize={3} />
+                        Seleccionar área
+                      </Box>
+                    </VStack>
+                  )}
+
+                  {/* Modo dibujo activo */}
+                  {isDrawing && (
+                    <VStack spacing={2} align="stretch">
+                      <Text fontSize="9px" color="#ff8a50" textTransform="uppercase" letterSpacing="0.1em">
+                        Dibujando...
+                      </Text>
+                      <Text fontSize="9px" color="rgba(255,255,255,0.35)" lineHeight="1.5">
+                        Clic y arrastra en el mapa para delimitar el área
+                      </Text>
+                      <Box
+                        as="button" w="full" py={1.5} borderRadius="md"
+                        bg="rgba(255,255,255,0.05)"
+                        border="1px solid rgba(255,255,255,0.1)"
+                        color="rgba(255,255,255,0.45)" fontSize="10px" fontWeight="600"
+                        letterSpacing="0.1em" textTransform="uppercase"
+                        cursor="pointer"
+                        onClick={() => setIsDrawing(false)}
+                        transition="all 0.15s"
+                        _hover={{ bg: 'rgba(255,255,255,0.08)' }}
+                        display="flex" alignItems="center" justifyContent="center" gap="5px"
+                      >
+                        <Icon as={FiX} boxSize={3} />
+                        Cancelar
+                      </Box>
+                    </VStack>
+                  )}
+
+                  {/* Área seleccionada */}
+                  {drawnBbox && !isDrawing && (
+                    <VStack spacing={2} align="stretch">
+                      <HStack justify="space-between" align="center">
+                        <Text fontSize="9px" color="rgba(255,255,255,0.2)" textTransform="uppercase" letterSpacing="0.1em">
+                          Área seleccionada
+                        </Text>
+                        <Box
+                          as="button" cursor="pointer"
+                          onClick={handleClearSelection}
+                          color="rgba(255,255,255,0.25)"
+                          _hover={{ color: 'rgba(255,80,80,0.7)' }}
+                          transition="color 0.15s"
+                          title="Limpiar selección"
+                        >
+                          <Icon as={FiTrash2} boxSize={3} />
+                        </Box>
+                      </HStack>
+                      <Box
+                        as="button" w="full" py={1.5} borderRadius="md"
+                        bg="rgba(255,255,255,0.04)"
+                        border="1px solid rgba(255,255,255,0.07)"
+                        color="rgba(255,255,255,0.35)" fontSize="10px" fontWeight="600"
+                        letterSpacing="0.1em" textTransform="uppercase"
+                        cursor="pointer"
+                        onClick={() => setIsDrawing(true)}
+                        transition="all 0.15s"
+                        _hover={{ bg: 'rgba(255,255,255,0.08)', borderColor: 'rgba(255,255,255,0.14)' }}
+                        display="flex" alignItems="center" justifyContent="center" gap="5px"
+                      >
+                        <Icon as={FiSquare} boxSize={3} />
+                        Nueva área
+                      </Box>
+                    </VStack>
+                  )}
+                </Box>
+
+                {/* ── Periodo, opacidad, actualizar ── */}
                 <Box borderTop="1px solid rgba(255,255,255,0.05)" px={3} py={3}>
                   <VStack spacing={3} align="stretch">
-                    {/* Period */}
                     <Box>
                       <Text fontSize="9px" color="rgba(255,255,255,0.2)" textTransform="uppercase" letterSpacing="0.1em" mb={1.5}>
                         Periodo
@@ -282,8 +457,7 @@ export function ParcelasPage({ isActive = false }: { isActive?: boolean }) {
                         <Box>
                           <Text fontSize="8px" color="rgba(255,255,255,0.18)" mb={0.5} letterSpacing="0.06em">DESDE</Text>
                           <input
-                            type="date"
-                            value={from}
+                            type="date" value={from}
                             onChange={(e) => setFrom(e.target.value)}
                             style={{
                               width: '100%',
@@ -301,8 +475,7 @@ export function ParcelasPage({ isActive = false }: { isActive?: boolean }) {
                         <Box>
                           <Text fontSize="8px" color="rgba(255,255,255,0.18)" mb={0.5} letterSpacing="0.06em">HASTA</Text>
                           <input
-                            type="date"
-                            value={to}
+                            type="date" value={to}
                             onChange={(e) => setTo(e.target.value)}
                             style={{
                               width: '100%',
@@ -320,7 +493,6 @@ export function ParcelasPage({ isActive = false }: { isActive?: boolean }) {
                       </VStack>
                     </Box>
 
-                    {/* Opacity */}
                     <Box>
                       <HStack justify="space-between" mb={1.5}>
                         <Text fontSize="9px" color="rgba(255,255,255,0.2)" textTransform="uppercase" letterSpacing="0.1em">
@@ -334,43 +506,32 @@ export function ParcelasPage({ isActive = false }: { isActive?: boolean }) {
                         <SliderTrack h="2px" bg="rgba(255,255,255,0.08)" borderRadius="full">
                           <SliderFilledTrack borderRadius="full" bgGradient="linear(to-r, #ff6b35, #ff8a50)" />
                         </SliderTrack>
-                        <SliderThumb
-                          boxSize={3} bg="white"
-                          boxShadow="0 0 0 2px rgba(255,138,80,0.5)"
-                        />
+                        <SliderThumb boxSize={3} bg="white" boxShadow="0 0 0 2px rgba(255,138,80,0.5)" />
                       </Slider>
                     </Box>
 
-                    {/* Update button */}
-                    <Box
-                      as="button"
-                      w="full"
-                      py={1.5}
-                      borderRadius="md"
-                      bg={imageLoading ? 'rgba(255,138,80,0.1)' : 'rgba(255,138,80,0.18)'}
-                      border="1px solid rgba(255,138,80,0.35)"
-                      color="#ff8a50"
-                      fontSize="10px"
-                      fontWeight="700"
-                      letterSpacing="0.1em"
-                      textTransform="uppercase"
-                      cursor={imageLoading ? 'not-allowed' : 'pointer'}
-                      onClick={!imageLoading ? handleApply : undefined}
-                      transition="all 0.15s"
-                      _hover={{ bg: 'rgba(255,138,80,0.28)', borderColor: 'rgba(255,138,80,0.55)' }}
-                      display="flex"
-                      alignItems="center"
-                      justifyContent="center"
-                      gap="6px"
-                    >
-                      {imageLoading
-                        ? <><Spinner size="xs" color="#ff8a50" /><span>Cargando</span></>
-                        : 'Actualizar'}
-                    </Box>
+                    {drawnBbox && (
+                      <Box
+                        as="button" w="full" py={1.5} borderRadius="md"
+                        bg={imageLoading ? 'rgba(255,138,80,0.1)' : 'rgba(255,138,80,0.18)'}
+                        border="1px solid rgba(255,138,80,0.35)"
+                        color="#ff8a50" fontSize="10px" fontWeight="700"
+                        letterSpacing="0.1em" textTransform="uppercase"
+                        cursor={imageLoading ? 'not-allowed' : 'pointer'}
+                        onClick={!imageLoading ? handleApply : undefined}
+                        transition="all 0.15s"
+                        _hover={{ bg: 'rgba(255,138,80,0.28)', borderColor: 'rgba(255,138,80,0.55)' }}
+                        display="flex" alignItems="center" justifyContent="center" gap="6px"
+                      >
+                        {imageLoading
+                          ? <><Spinner size="xs" color="#ff8a50" /><span>Cargando</span></>
+                          : 'Actualizar'}
+                      </Box>
+                    )}
                   </VStack>
                 </Box>
 
-                {/* NDVI Legend */}
+                {/* ── Escala NDVI ──────────────────── */}
                 <Box borderTop="1px solid rgba(255,255,255,0.05)" px={3} py={2.5}>
                   <Text fontSize="9px" color="rgba(255,255,255,0.2)" textTransform="uppercase" letterSpacing="0.1em" mb={2}>
                     Escala
@@ -388,6 +549,24 @@ export function ParcelasPage({ isActive = false }: { isActive?: boolean }) {
             )}
           </Box>
         </Box>
+
+        {/* ── Hint centrado mientras se dibuja ─────── */}
+        {isDrawing && (
+          <Box
+            position="absolute" top="50%" left="50%" transform="translate(-50%, -50%)"
+            zIndex={999} pointerEvents="none"
+          >
+            <Box
+              bg="rgba(0,0,0,0.72)" backdropFilter="blur(10px)"
+              px={4} py={2.5} borderRadius="lg"
+              border="1px solid rgba(255,138,80,0.25)"
+            >
+              <Text fontSize="12px" color="rgba(255,255,255,0.6)" textAlign="center">
+                Clic y arrastra para delimitar el área
+              </Text>
+            </Box>
+          </Box>
+        )}
 
         {/* ── Loading overlay ──────────────────────── */}
         {imageLoading && (
@@ -431,6 +610,8 @@ export function ParcelasPage({ isActive = false }: { isActive?: boolean }) {
         >
           <MapResizer isActive={isActive} />
           <MapBoundsController isNdvi={isNdvi} />
+          <DrawRectangle active={isDrawing} onComplete={handleDrawComplete} />
+          <SelectionRect bbox={drawnBbox} />
           <MapEventHandler onViewportChange={handleViewportChange} />
 
           <TileLayer
@@ -471,7 +652,7 @@ export function ParcelasPage({ isActive = false }: { isActive?: boolean }) {
           <HStack justify="space-between">
             <Text fontSize="9px" color="rgba(255,255,255,0.28)" letterSpacing="0.05em">
               {isNdvi
-                ? `Sentinel-2 L2A · NDVI · ${from} → ${to} · Zoom adaptativo`
+                ? `Sentinel-2 L2A · NDVI · ${from} → ${to}`
                 : 'Mapbox Satellite v9 · Alta resolución comercial'}
             </Text>
             <Text fontSize="9px" color="rgba(255,255,255,0.18)" letterSpacing="0.05em">
@@ -482,8 +663,8 @@ export function ParcelasPage({ isActive = false }: { isActive?: boolean }) {
 
       </Box>
 
-      {/* ── NDVI Statistics Section ─────────────────── */}
-      {isNdvi && (
+      {/* ── NDVI Statistics (solo cuando hay área seleccionada) ── */}
+      {isNdvi && drawnBbox && (
         <Box mt={6}>
           {ndviStatsLoading && (
             <HStack spacing={3} justify="center" py={8}>
@@ -500,6 +681,16 @@ export function ParcelasPage({ isActive = false }: { isActive?: boolean }) {
               <Text fontSize="sm" color="rgba(255,255,255,0.3)">No hay estadísticas NDVI disponibles para este periodo.</Text>
             </HStack>
           )}
+        </Box>
+      )}
+
+      {/* ── Instrucción cuando NDVI activo pero sin selección ── */}
+      {isNdvi && !drawnBbox && !isDrawing && (
+        <Box mt={6} textAlign="center" py={8}>
+          <Icon as={FiSquare} color="rgba(255,138,80,0.3)" boxSize={6} mb={3} />
+          <Text fontSize="sm" color="rgba(255,255,255,0.3)">
+            Selecciona un área en el mapa para ver el análisis NDVI
+          </Text>
         </Box>
       )}
     </Box>
