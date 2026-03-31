@@ -110,15 +110,26 @@ export class SatelliteService {
     return this.cachedToken.token;
   }
 
-  async getNDVI(bbox: number[], from: string, to: string): Promise<NDVIResult> {
+  async getNDVI(bbox: number[], from: string, to: string, geometry?: number[][]): Promise<NDVIResult> {
     const token = await this.getToken();
+
+    // Si se provee un polígono, usarlo como máscara exacta en lugar del bbox rectangular.
+    // Sentinel Hub Statistics API acepta GeoJSON geometry (coordenadas en orden [lng, lat]).
+    const bounds: Record<string, unknown> = geometry && geometry.length >= 3
+      ? {
+          geometry: {
+            type: 'Polygon',
+            coordinates: [[...geometry, geometry[0]]], // cerrar el anillo
+          },
+        }
+      : {
+          bbox,
+          properties: { crs: 'http://www.opengis.net/def/crs/EPSG/0/4326' },
+        };
 
     const body = {
       input: {
-        bounds: {
-          bbox,
-          properties: { crs: 'http://www.opengis.net/def/crs/EPSG/0/4326' },
-        },
+        bounds,
         data: [
           {
             type: 'S2L2A',

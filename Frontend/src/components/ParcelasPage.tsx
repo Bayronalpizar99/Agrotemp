@@ -329,8 +329,11 @@ export function ParcelasPage({ isActive = false }: { isActive?: boolean }) {
 
   useEffect(() => {
     if (layerMode !== 'ndvi' || !drawnSelection) return;
+    // Convertir [lat, lng] (Leaflet) → [lng, lat] (GeoJSON) para que Sentinel Hub
+    // calcule las estadísticas únicamente sobre los píxeles dentro del polígono.
+    const geoJsonGeometry = drawnSelection.latlngs.map(([lat, lng]) => [lng, lat] as [number, number]);
     setNdviStatsLoading(true);
-    satelliteService.getNDVI(drawnSelection.bbox, from, to)
+    satelliteService.getNDVI(drawnSelection.bbox, from, to, geoJsonGeometry)
       .then((result) => { setNdviStats(result); })
       .catch(() => { setNdviStats(null); })
       .finally(() => { setNdviStatsLoading(false); });

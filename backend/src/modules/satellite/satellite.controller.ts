@@ -13,10 +13,12 @@ export class SatelliteController {
   @ApiQuery({ name: 'bbox', required: true, example: '-84.15,10.00,-84.10,10.05', description: 'Bounding box: minLon,minLat,maxLon,maxLat' })
   @ApiQuery({ name: 'from', required: true, example: '2026-01-01' })
   @ApiQuery({ name: 'to', required: true, example: '2026-01-31' })
+  @ApiQuery({ name: 'geometry', required: false, description: 'Polígono GeoJSON como JSON: [[lng,lat],[lng,lat],...]' })
   async getNDVI(
     @Query('bbox') bboxStr: string,
     @Query('from') from: string,
     @Query('to') to: string,
+    @Query('geometry') geometryStr?: string,
   ) {
     if (!bboxStr || !from || !to) {
       throw new HttpException('bbox, from y to son requeridos', HttpStatus.BAD_REQUEST);
@@ -27,8 +29,18 @@ export class SatelliteController {
       throw new HttpException('bbox debe tener 4 valores numéricos: minLon,minLat,maxLon,maxLat', HttpStatus.BAD_REQUEST);
     }
 
+    let geometry: number[][] | undefined;
+    if (geometryStr) {
+      try {
+        geometry = JSON.parse(geometryStr);
+        if (!Array.isArray(geometry) || geometry.length < 3) geometry = undefined;
+      } catch {
+        geometry = undefined;
+      }
+    }
+
     try {
-      const data = await this.satelliteService.getNDVI(bbox, from, to);
+      const data = await this.satelliteService.getNDVI(bbox, from, to, geometry);
       return { success: true, data };
     } catch (error) {
       throw new HttpException(

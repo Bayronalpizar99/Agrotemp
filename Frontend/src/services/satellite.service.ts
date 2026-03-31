@@ -23,12 +23,13 @@ export interface NDVIResult {
 }
 
 export const satelliteService = {
-  getNDVI: async (bbox: number[], from: string, to: string): Promise<NDVIResult> => {
-    const params = new URLSearchParams({
-      bbox: bbox.join(','),
-      from,
-      to,
-    });
+  // geometry: polígono en orden GeoJSON [[lng, lat], ...] — cuando se provee,
+  // el backend calcula las estadísticas solo sobre los píxeles dentro del polígono.
+  getNDVI: async (bbox: number[], from: string, to: string, geometry?: [number, number][]): Promise<NDVIResult> => {
+    const params = new URLSearchParams({ bbox: bbox.join(','), from, to });
+    if (geometry && geometry.length >= 3) {
+      params.set('geometry', JSON.stringify(geometry));
+    }
 
     const response = await fetch(`${API_URL}/ndvi?${params}`);
 
