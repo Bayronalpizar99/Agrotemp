@@ -66,7 +66,7 @@ function App() {
             <InfoPage />
           </Box>
           <Box display={activePage === 'Parcelas' ? 'block' : 'none'}>
-            <ParcelasPage />
+            <ParcelasPage isActive={activePage === 'Parcelas'} />
           </Box>
         </Container>
 

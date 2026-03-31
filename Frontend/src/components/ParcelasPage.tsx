@@ -11,7 +11,7 @@ import {
   Spinner,
   Icon,
 } from '@chakra-ui/react';
-import { MapContainer, TileLayer, ImageOverlay, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, ImageOverlay, useMapEvents, useMap } from 'react-leaflet';
 import { FiAlertCircle } from 'react-icons/fi';
 import type { LatLngBoundsExpression } from 'leaflet';
 import { satelliteService } from '../services/satellite.service';
@@ -39,6 +39,16 @@ const NDVI_LEGEND = [
   { color: '#1b5e20', label: 'Veg. muy densa' },
 ];
 
+function MapResizer({ isActive }: { isActive: boolean }) {
+  const map = useMap();
+  useEffect(() => {
+    if (isActive) {
+      setTimeout(() => map.invalidateSize(), 100);
+    }
+  }, [isActive, map]);
+  return null;
+}
+
 function MapEventHandler({ onViewportChange }: { onViewportChange: (bbox: number[]) => void }) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useMapEvents({
@@ -53,7 +63,7 @@ function MapEventHandler({ onViewportChange }: { onViewportChange: (bbox: number
   return null;
 }
 
-export function ParcelasPage() {
+export function ParcelasPage({ isActive = false }: { isActive?: boolean }) {
   const today = new Date();
   const defaultTo = today.toISOString().split('T')[0];
   const defaultFrom = new Date(today.getTime() - 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
@@ -400,6 +410,7 @@ export function ParcelasPage() {
           zoomControl={false}
           style={{ height: '76vh', width: '100%', background: '#080808' }}
         >
+          <MapResizer isActive={isActive} />
           <MapEventHandler onViewportChange={handleViewportChange} />
 
           <TileLayer
