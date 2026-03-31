@@ -48,9 +48,6 @@ import {
 } from 'react-icons/fi';
 import { agroAnalyticsService } from '../services/agro-analytics.service';
 import type { AgroReportResult } from '../services/agro-analytics.service';
-import { satelliteService } from '../services/satellite.service';
-import type { NDVIResult } from '../services/satellite.service';
-import { NDVISection } from './NDVISection';
 
 import {
   LineChart,
@@ -158,7 +155,6 @@ interface ChatMessage {
     role: 'user' | 'assistant';
     content?: string;
     reportData?: AgroReportResult;
-    ndviData?: NDVIResult;
     cropName?: string;
     isLoading?: boolean;
 }
@@ -221,9 +217,6 @@ export const AgroReportPage = () => {
     persistedState?.showCustomInputs ?? (persistedState?.selectedCrop === 'Personalizado')
   );
   
-  // NDVI / Satellite State
-  const [ndviBbox, setNdviBbox] = useState('-84.5220,10.3550,-84.5050,10.3720');
-
   // Voice Input State
   const [isListening, setIsListening] = useState(false);
   
@@ -352,20 +345,13 @@ export const AgroReportPage = () => {
       const loadingId = Date.now() + 1;
       setMessages(prev => [...prev, { id: loadingId, role: 'assistant', isLoading: true }]);
 
-      // Fetch weather report + NDVI in parallel
-      const bboxArr = ndviBbox.split(',').map(Number);
-      const [data, ndviData] = await Promise.all([
-        agroAnalyticsService.getReport({
-          startDate,
-          endDate,
-          cropBaseTemp: baseTemp,
-          cropMaxTemp: maxTemp,
-          cropName: selectedCrop !== 'Personalizado' ? selectedCrop : undefined,
-        }),
-        bboxArr.length === 4 && bboxArr.every(n => !isNaN(n))
-          ? satelliteService.getNDVI(bboxArr, startDate, endDate).catch(() => null)
-          : Promise.resolve(null),
-      ]);
+      const data = await agroAnalyticsService.getReport({
+        startDate,
+        endDate,
+        cropBaseTemp: baseTemp,
+        cropMaxTemp: maxTemp,
+        cropName: selectedCrop !== 'Personalizado' ? selectedCrop : undefined,
+      });
 
       setCurrentReport(data);
       setReportCropName(selectedCrop !== 'Personalizado' ? selectedCrop : undefined);
@@ -376,7 +362,6 @@ export const AgroReportPage = () => {
           id: Date.now() + 2,
           role: 'assistant',
           reportData: data,
-          ndviData: ndviData ?? undefined,
           cropName: selectedCrop
       }));
 
@@ -658,13 +643,6 @@ export const AgroReportPage = () => {
                                     </Box>
                                 )}
 
-                                {/* NDVI Section */}
-                                {msg.ndviData && (
-                                    <Box mt={4}>
-                                        <Divider borderColor="whiteAlpha.200" mb={4} />
-                                        <NDVISection data={msg.ndviData} />
-                                    </Box>
-                                )}
                             </VStack>
                         ) : (
                             <Text whiteSpace="pre-wrap">{msg.content}</Text>
@@ -851,23 +829,6 @@ export const AgroReportPage = () => {
                             </Box>
                         </SimpleGrid>
                     )}
-                    <Box>
-                        <Text fontSize="xs" color="gray.500" mb={1}>Coordenadas NDVI (bbox)</Text>
-                        <Input
-                            size="sm"
-                            value={ndviBbox}
-                            onChange={(e) => setNdviBbox(e.target.value)}
-                            placeholder="-84.136,10.002,-84.095,10.038"
-                            bg="whiteAlpha.100"
-                            border="1px solid"
-                            borderColor="whiteAlpha.200"
-                            borderRadius="lg"
-                            w="full"
-                            fontSize="xs"
-                            color="gray.300"
-                            _hover={{ bg: "whiteAlpha.200" }}
-                        />
-                    </Box>
                     <Button
                         size="sm"
                         colorScheme="orange"
@@ -933,20 +894,6 @@ export const AgroReportPage = () => {
                     fontSize="xs"
                     color="gray.300"
                     sx={{ colorScheme: 'dark', '::-webkit-calendar-picker-indicator': { filter: 'invert(0.6) opacity(0.6)' } }}
-                    _hover={{ bg: "whiteAlpha.200" }}
-                />
-                <Input
-                    size="sm"
-                    value={ndviBbox}
-                    onChange={(e) => setNdviBbox(e.target.value)}
-                    placeholder="bbox NDVI"
-                    bg="whiteAlpha.100"
-                    border="1px solid"
-                    borderColor="whiteAlpha.200"
-                    borderRadius="lg"
-                    w="200px"
-                    fontSize="xs"
-                    color="gray.300"
                     _hover={{ bg: "whiteAlpha.200" }}
                 />
                 <Button

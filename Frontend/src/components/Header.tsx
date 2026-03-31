@@ -1,13 +1,10 @@
 // src/components/Header.tsx
 import {
-  Flex,
-  Heading,
-  HStack,
-  Link,
   Box,
+  VStack,
   Text,
+  Heading,
   Button,
-  IconButton,
   useToast,
   Modal,
   ModalOverlay,
@@ -17,82 +14,31 @@ import {
   ModalBody,
   ModalCloseButton,
   useDisclosure,
-  VStack,
   FormLabel,
-  Menu,
-  MenuButton,
-  MenuList,
-  MenuItem
+  HStack,
 } from '@chakra-ui/react';
 import { weatherService } from '../services/weather.service';
 import { useState } from 'react';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 import "../styles/datepicker.css";
-import { FiDownload, FiMenu } from 'react-icons/fi';
+import { FiDownload, FiActivity } from 'react-icons/fi';
 
-
-interface HeaderProps { 
-    isVisible: boolean; 
-    activePage: string; 
-    setActivePage: (page: string) => void; 
-    isScrolled: boolean;
+interface HeaderProps {
+  isVisible: boolean;
+  activePage: string;
+  setActivePage: (page: string) => void;
+  isScrolled: boolean;
 }
 
-// ✅ MEJORA: Componente NavLink actualizado con el nuevo estilo para el estado activo (borde degradado)
-const NavLink = ({ name, activePage, setActivePage }: { name: string; activePage: string; setActivePage: (page: string) => void; }) => {
-    const isActive = name === activePage;
-    if (isActive) {
-        return (
-          // Contenedor exterior para el borde degradado
-          <Box
-            p="1px" // Grosor del borde
-            borderRadius="lg" // El radio del borde del contenedor exterior
-            bgGradient="linear(to-b, rgba(255, 129, 68, 0.4), rgba(255, 255, 255, 0.1))"
-            // Hacemos el Box exterior clickeable para todo el área del botón
-            onClick={() => setActivePage(name)} 
-            cursor="pointer"
-            transition="all 0.2s ease-in-out" // Transición para el hover
-            _hover={{
-              transform: 'translateY(-2px)', // Un ligero levantamiento al hacer hover
-              boxShadow: 'glow', // Opcional: añade el efecto de sombra que ya tienes en otros componentes
-            }}
-          >
-            {/* Contenedor interior con el color de fondo sólido */}
-            <Box 
-              bg="#2f231c" // ✅ Fondo sólido con el color especificado
-              px={6} // Padding horizontal
-              py={2}   // Padding vertical
-              borderRadius="lg" // El radio del borde del contenedor interior debe coincidir
-              display="flex" // Para centrar el texto si fuera necesario
-              alignItems="center" // Para centrar el texto verticalmente
-              justifyContent="center" // Para centrar el texto horizontalmente
-            >
-              {/* ✅ Color de texto blanco */}
-              <Text color="white" fontSize="md" fontWeight="medium">{name}</Text>
-            </Box>
-          </Box>
-        );
-      }
-      return (
-        <Link 
-          px={6} // Consistencia en el padding para que no cambie al activarse
-          py={2}   // Consistencia en el padding
-          color="rgba(255, 255, 255, 0.8)" 
-          fontSize="md" // Consistencia en el tamaño de fuente
-          fontWeight="medium" 
-          _hover={{ color: 'white', textDecoration: 'none' }} 
-          onClick={() => setActivePage(name)}
-          borderRadius="lg" // También para los inactivos, para que la transición sea suave
-          transition="all 0.2s ease-in-out" // Transición para el hover
-        >
-          {name}
-        </Link>
-      );
-};
+const NAV_ITEMS = [
+  { name: 'Reporte IA', label: 'Reporte IA' },
+  { name: 'Dashboard', label: 'Dashboard' },
+  { name: 'Parcelas', label: 'Parcelas' },
+  { name: 'Info', label: 'Info' },
+];
 
-
-export const Header = ({ isVisible, activePage, setActivePage }: HeaderProps) => {
+export const Header = ({ activePage, setActivePage }: HeaderProps) => {
   const toast = useToast();
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [isLoading, setIsLoading] = useState(false);
@@ -112,258 +58,252 @@ export const Header = ({ isVisible, activePage, setActivePage }: HeaderProps) =>
 
   const handleExport = async () => {
     if (!startDate || !endDate) {
-      toast({
-        title: "Error",
-        description: "Por favor seleccione ambas fechas",
-        status: "error",
-        duration: 3000,
-        isClosable: true,
-      });
+      toast({ title: 'Error', description: 'Por favor seleccione ambas fechas', status: 'error', duration: 3000, isClosable: true });
       return;
     }
-
     setIsLoading(true);
     try {
-      // Asegurarnos de que las fechas estén en el formato correcto y ajustadas a la zona horaria local
       const startDateStr = startDate.toISOString().split('T')[0] + 'T00:00:00.000Z';
       const endDateStr = endDate.toISOString().split('T')[0] + 'T23:59:59.999Z';
-
-      // Llamar al servicio de descarga
-      const result = await weatherService.downloadHourlyData(
-        startDateStr,
-        endDateStr
-      );
-
+      const result = await weatherService.downloadHourlyData(startDateStr, endDateStr);
       if (result.success) {
-        toast({
-          title: "Éxito",
-          description: "Los datos se han descargado correctamente",
-          status: "success",
-          duration: 3000,
-          isClosable: true,
-        });
+        toast({ title: 'Éxito', description: 'Los datos se han descargado correctamente', status: 'success', duration: 3000, isClosable: true });
         onClose();
       }
     } catch (error) {
-      console.error('Error al descargar datos:', error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "No se pudieron descargar los datos",
-        status: "error",
-        duration: 3000,
-        isClosable: true,
-      });
+      toast({ title: 'Error', description: error instanceof Error ? error.message : 'No se pudieron descargar los datos', status: 'error', duration: 3000, isClosable: true });
     } finally {
       setIsLoading(false);
     }
   };
-  
+
   return (
-  <Flex
-    as="header"
-    w="100%"
-    py={{ base: 3, md: 6 }}
-    px={{ base: 4, md: 12 }}
-    justifyContent="center"
-    alignItems="center"
-    bg="transparent"
-    position="fixed"
-    top={{ base: 1, md: 4 }}
-    left={0}
-    right={0}
-    zIndex={1000}
-    opacity={isVisible ? 1 : 0}
-    transition="opacity 0.3s ease-in-out"
-  >
-    <Flex
-      py={{ base: 2, md: 3 }}
-      px={{ base: 3, md: 6 }}
-      w={{ base: "100%", md: "800px" }}
-      bg="rgba(41, 41, 41, 0.8)"
-      backdropFilter="blur(10px)"
-      border="1px solid rgba(255, 255, 255, 0.1)"
-      borderRadius="xl"
-      alignItems="center"
-      justifyContent="space-between"
-      boxShadow="glow"
-      transition="all 0.4s ease-in-out" 
-    >
-      {/* Logo */}
-      <Flex alignItems="center" gap={2}>
-         <Box
-          bg="linear-gradient(135deg, #ff8a50, #ff6b35)"
-          p={1.5}
-          borderRadius="md"
-          display="flex"
-          alignItems="center"
-          justifyContent="center"
-        >
-          <Box color="white" fontSize="sm" fontWeight="bold">🌦️</Box>
-        </Box>
-        <Heading
-          size="sm"
-          color="white"
-          fontFamily="'Fraunces', serif"
-          fontWeight="400"
-          whiteSpace="nowrap"
-          letterSpacing="-0.01em"
-        >
-          Agrotemp
-        </Heading>
-        <Box
-          w="6px"
-          h="6px"
-          borderRadius="full"
-          bg="#48c78e"
-          flexShrink={0}
-          sx={{ animation: 'livePulse 2.2s ease-in-out infinite' }}
-        />
-      </Flex>
-
-      {/* Navegación desktop */}
-      <HStack spacing={4} display={{ base: "none", md: "flex" }}>
-        <NavLink name="Reporte IA" activePage={activePage} setActivePage={setActivePage} />
-        <NavLink name="Dashboard" activePage={activePage} setActivePage={setActivePage} />
-        <NavLink name="Parcelas" activePage={activePage} setActivePage={setActivePage} />
-        <NavLink name="Info" activePage={activePage} setActivePage={setActivePage} />
-        
-        <Button
-            variant="outline"
-            size="sm"
-            leftIcon={<FiDownload />}
-            onClick={onOpen}
-        >
-            Descargar Datos
-        </Button>
-      </HStack>
-
-      {/* Navegación móvil */}
-      <HStack spacing={2} display={{ base: "flex", md: "none" }}>
-        <IconButton
-          aria-label="Descargar datos"
-          icon={<FiDownload />}
-          variant="outline"
-          size="sm"
-          onClick={onOpen}
-        />
-
-        <Menu>
-          <MenuButton
-            as={IconButton}
-            aria-label="Abrir menú"
-            icon={<FiMenu />}
-            size="sm"
-            variant="outline"
-          />
-          <MenuList bg="#1A1A1A" borderColor="rgba(255, 255, 255, 0.15)" minW="180px">
-            <MenuItem
-              bg="transparent"
-              color="white"
-              _hover={{ bg: 'whiteAlpha.200' }}
-              onClick={() => setActivePage('Reporte IA')}
-            >
-              Reporte IA
-            </MenuItem>
-            <MenuItem
-              bg="transparent"
-              color="white"
-              _hover={{ bg: 'whiteAlpha.200' }}
-              onClick={() => setActivePage('Dashboard')}
-            >
-              Dashboard
-            </MenuItem>
-            <MenuItem
-              bg="transparent"
-              color="white"
-              _hover={{ bg: 'whiteAlpha.200' }}
-              onClick={() => setActivePage('Parcelas')}
-            >
-              Parcelas
-            </MenuItem>
-            <MenuItem
-              bg="transparent"
-              color="white"
-              _hover={{ bg: 'whiteAlpha.200' }}
-              onClick={() => setActivePage('Info')}
-            >
-              Info
-            </MenuItem>
-          </MenuList>
-        </Menu>
-      </HStack>
-    </Flex>
-
-    {/* Modal de selección de fechas */}
-    <Modal isOpen={isOpen} onClose={onClose} isCentered>
-      <ModalOverlay backdropFilter="blur(5px)" bg="blackAlpha.700" />
-      <ModalContent 
-        bg="#1A1A1A" 
-        mx={4}
-        border="1px solid rgba(255, 255, 255, 0.1)"
-        borderRadius="xl"
-        boxShadow="0 10px 40px rgba(0, 0, 0, 0.5)"
+    <>
+      <Box
+        as="aside"
+        position="fixed"
+        left={0}
+        top={0}
+        h="100vh"
+        w="210px"
+        zIndex={1000}
+        display="flex"
+        flexDirection="column"
+        // Fondo con sutil ruido/textura via gradientes apilados
+        bg="rgba(15, 15, 15, 0.97)"
+        borderRight="1px solid rgba(255, 255, 255, 0.06)"
+        // Línea decorativa naranja muy sutil en el borde derecho superior
+        _before={{
+          content: '""',
+          position: 'absolute',
+          top: 0,
+          right: '-1px',
+          w: '1px',
+          h: '80px',
+          bgGradient: 'linear(to-b, transparent, rgba(255,138,80,0.6), transparent)',
+          zIndex: 1,
+        }}
       >
-        <ModalHeader color="white" borderBottom="1px solid rgba(255, 255, 255, 0.05)">
-          Descargar Datos Históricos
-        </ModalHeader>
-        <ModalCloseButton color="white" mt={1} />
-        <ModalBody py={6}>
-          <VStack spacing={5}>
-            <Box w="full">
-              <FormLabel color="gray.300" fontSize="sm">Fecha inicial</FormLabel>
-              <DatePicker
-                selected={startDate}
-                onChange={handleDateSelect}
-                dateFormat="dd/MM/yyyy"
-                placeholderText="Seleccione fecha inicial"
-                maxDate={new Date()}
-                className="date-picker"
-              />
+        {/* ── Logo ───────────────────────────────── */}
+        <Box px={5} pt={7} pb={6}>
+          <HStack spacing={2.5} align="center">
+            <Box
+              bg="linear-gradient(135deg, #ff8a50, #ff6b35)"
+              p={1.5}
+              borderRadius="8px"
+              display="flex"
+              alignItems="center"
+              justifyContent="center"
+              flexShrink={0}
+              boxShadow="0 0 12px rgba(255,107,53,0.35)"
+            >
+              <Box color="white" fontSize="13px">🌦️</Box>
             </Box>
-            <Box w="full">
-              <FormLabel color="gray.300" fontSize="sm">Fecha final</FormLabel>
-              <DatePicker
-                selected={endDate}
-                onChange={handleDateSelect}
-                dateFormat="dd/MM/yyyy"
-                placeholderText="Seleccione fecha final"
-                minDate={startDate || undefined}
-                maxDate={new Date()}
-                className="date-picker"
-              />
+            <Box>
+              <Heading
+                size="sm"
+                color="white"
+                fontFamily="'Fraunces', serif"
+                fontWeight="500"
+                letterSpacing="-0.02em"
+                lineHeight={1}
+              >
+                Agrotemp
+              </Heading>
+              <HStack spacing={1.5} mt={0.5}>
+                <Box
+                  w="5px"
+                  h="5px"
+                  borderRadius="full"
+                  bg="#48c78e"
+                  flexShrink={0}
+                  sx={{ animation: 'livePulse 2.2s ease-in-out infinite' }}
+                />
+                <Text fontSize="9px" color="rgba(255,255,255,0.3)" letterSpacing="0.08em" textTransform="uppercase">
+                  En vivo
+                </Text>
+              </HStack>
             </Box>
-          </VStack>
-        </ModalBody>
+          </HStack>
+        </Box>
 
-        <ModalFooter borderTop="1px solid rgba(255, 255, 255, 0.05)">
-          <Button 
-            variant="ghost" 
-            mr={3} 
-            onClick={onClose}
-            color="gray.300"
-            _hover={{ bg: "whiteAlpha.100", color: "white" }}
-          >
-            Cancelar
-          </Button>
+        {/* ── Separador ──────────────────────────── */}
+        <Box mx={5} mb={5} h="1px" bg="rgba(255,255,255,0.06)" />
+
+        {/* ── Sección nav ────────────────────────── */}
+        <Box px={3} mb={2}>
+          <Text fontSize="9px" color="rgba(255,255,255,0.2)" letterSpacing="0.12em" textTransform="uppercase" px={2} mb={1}>
+            Navegación
+          </Text>
+        </Box>
+
+        {/* ── Nav items ──────────────────────────── */}
+        <VStack spacing={0.5} align="stretch" px={3} flex={1}>
+          {NAV_ITEMS.map(({ name, label }) => {
+            const isActive = name === activePage;
+            return (
+              <Box
+                key={name}
+                position="relative"
+                onClick={() => setActivePage(name)}
+                cursor="pointer"
+                role="group"
+              >
+                {/* Línea activa izquierda — el "sensor" */}
+                {isActive && (
+                  <Box
+                    position="absolute"
+                    left={0}
+                    top="50%"
+                    transform="translateY(-50%)"
+                    w="2px"
+                    h="60%"
+                    borderRadius="full"
+                    bg="linear-gradient(to bottom, #ff8a50, #ff6b35)"
+                    boxShadow="0 0 8px rgba(255,107,53,0.7)"
+                  />
+                )}
+                <Box
+                  pl={isActive ? 5 : 4}
+                  pr={4}
+                  py={2.5}
+                  borderRadius="lg"
+                  bg={isActive ? 'rgba(255,138,80,0.08)' : 'transparent'}
+                  border="1px solid"
+                  borderColor={isActive ? 'rgba(255,138,80,0.18)' : 'transparent'}
+                  transition="all 0.15s ease"
+                  _groupHover={!isActive ? { bg: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.06)' } : {}}
+                >
+                  <Text
+                    fontSize="sm"
+                    fontWeight={isActive ? '500' : '400'}
+                    color={isActive ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.45)'}
+                    transition="color 0.15s"
+                    _groupHover={!isActive ? { color: 'rgba(255,255,255,0.75)' } : {}}
+                    letterSpacing="-0.01em"
+                  >
+                    {label}
+                  </Text>
+                </Box>
+              </Box>
+            );
+          })}
+        </VStack>
+
+        {/* ── Fondo degradado inferior ────────────── */}
+        <Box px={4} pb={6} pt={4}>
+          <Box h="1px" bg="rgba(255,255,255,0.06)" mb={4} />
+
+          {/* Indicador de estado */}
+          <HStack spacing={2} mb={4} px={1}>
+            <Box as={FiActivity} color="rgba(72,199,142,0.7)" boxSize={3} />
+            <Text fontSize="10px" color="rgba(255,255,255,0.25)" letterSpacing="0.04em">
+              Estación activa
+            </Text>
+          </HStack>
+
           <Button
-            bgGradient="linear(to-r, #ff8a50, #ff6b35)"
-            color="white"
+            size="sm"
+            leftIcon={<FiDownload size={12} />}
+            onClick={onOpen}
+            w="full"
+            bg="rgba(255,255,255,0.05)"
+            color="rgba(255,255,255,0.55)"
+            border="1px solid rgba(255,255,255,0.08)"
+            borderRadius="lg"
+            fontSize="xs"
+            fontWeight="400"
             _hover={{
-              bgGradient: "linear(to-r, #ff6b35, #ff8a50)",
-              transform: "translateY(-1px)",
-              boxShadow: "0 4px 12px rgba(255, 138, 80, 0.3)"
+              bg: 'rgba(255,138,80,0.1)',
+              borderColor: 'rgba(255,138,80,0.3)',
+              color: 'rgba(255,255,255,0.85)',
             }}
-            _active={{
-              transform: "translateY(0)",
-            }}
-            onClick={handleExport}
-            isLoading={isLoading}
-            loadingText="Descargando..."
+            transition="all 0.2s"
           >
-            Descargar
+            Descargar datos
           </Button>
-        </ModalFooter>
-      </ModalContent>
-    </Modal>
-  </Flex>
-)};
+        </Box>
+      </Box>
+
+      {/* ── Modal ───────────────────────────────────── */}
+      <Modal isOpen={isOpen} onClose={onClose} isCentered>
+        <ModalOverlay backdropFilter="blur(5px)" bg="blackAlpha.700" />
+        <ModalContent
+          bg="#1A1A1A"
+          mx={4}
+          border="1px solid rgba(255, 255, 255, 0.1)"
+          borderRadius="xl"
+          boxShadow="0 10px 40px rgba(0, 0, 0, 0.5)"
+        >
+          <ModalHeader color="white" borderBottom="1px solid rgba(255, 255, 255, 0.05)">
+            Descargar Datos Históricos
+          </ModalHeader>
+          <ModalCloseButton color="white" mt={1} />
+          <ModalBody py={6}>
+            <VStack spacing={5}>
+              <Box w="full">
+                <FormLabel color="gray.300" fontSize="sm">Fecha inicial</FormLabel>
+                <DatePicker
+                  selected={startDate}
+                  onChange={handleDateSelect}
+                  dateFormat="dd/MM/yyyy"
+                  placeholderText="Seleccione fecha inicial"
+                  maxDate={new Date()}
+                  className="date-picker"
+                />
+              </Box>
+              <Box w="full">
+                <FormLabel color="gray.300" fontSize="sm">Fecha final</FormLabel>
+                <DatePicker
+                  selected={endDate}
+                  onChange={handleDateSelect}
+                  dateFormat="dd/MM/yyyy"
+                  placeholderText="Seleccione fecha final"
+                  minDate={startDate || undefined}
+                  maxDate={new Date()}
+                  className="date-picker"
+                />
+              </Box>
+            </VStack>
+          </ModalBody>
+          <ModalFooter borderTop="1px solid rgba(255, 255, 255, 0.05)">
+            <Button variant="ghost" mr={3} onClick={onClose} color="gray.300" _hover={{ bg: 'whiteAlpha.100', color: 'white' }}>
+              Cancelar
+            </Button>
+            <Button
+              bgGradient="linear(to-r, #ff8a50, #ff6b35)"
+              color="white"
+              _hover={{ bgGradient: 'linear(to-r, #ff6b35, #ff8a50)', transform: 'translateY(-1px)', boxShadow: '0 4px 12px rgba(255, 138, 80, 0.3)' }}
+              _active={{ transform: 'translateY(0)' }}
+              onClick={handleExport}
+              isLoading={isLoading}
+              loadingText="Descargando..."
+            >
+              Descargar
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+    </>
+  );
+};

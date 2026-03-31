@@ -41,20 +41,19 @@ function App() {
     <Box minH="100vh" position="relative" isolation="isolate">
       <ParticleBackground />
 
-      <Box position="relative" zIndex={1}>
+      <Box position="relative" zIndex={1} display="flex">
         <Header
           isVisible={true}
           activePage={activePage}
           setActivePage={setActivePage}
-          // ✅ Se pasa un valor fijo o se puede eliminar la prop si ya no es necesaria en Header.
-          isScrolled={false} 
+          isScrolled={false}
         />
 
+        <Box flex={1} ml="210px" minW={0}>
         <Container
           maxW="container.xl"
           px={{ base: 3, md: 4 }}
-          py={4}
-          pt={{ base: 28, md: 40 }}
+          py={6}
           pb={{ base: 20, md: 16 }}
         >
           <Box display={activePage === 'Reporte IA' ? 'block' : 'none'}>
@@ -72,6 +71,7 @@ function App() {
         </Container>
 
         {activePage !== 'Reporte IA' && <Footer />}
+        </Box>
       </Box>
     </Box>
     <FeedbackWidget activePage={activePage} />

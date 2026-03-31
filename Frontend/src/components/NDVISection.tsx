@@ -83,9 +83,10 @@ const CardWrapper = ({ children }: { children: React.ReactNode }) => (
 
 interface NDVISectionProps {
   data: NDVIResult;
+  hideImageToggle?: boolean;
 }
 
-export function NDVISection({ data }: NDVISectionProps) {
+export function NDVISection({ data, hideImageToggle }: NDVISectionProps) {
   const { summary, timeSeries, bbox, period } = data;
   const classColor = getClassColor(summary.avgNDVI);
 
@@ -288,7 +289,7 @@ export function NDVISection({ data }: NDVISectionProps) {
       )}
 
       {/* Satellite image toggle */}
-      <Box
+      {!hideImageToggle && <Box
         p="1px"
         borderRadius="xl"
         bgGradient="linear(to-b, rgba(67, 160, 71, 0.2), rgba(255, 255, 255, 0.05))"
@@ -375,7 +376,7 @@ export function NDVISection({ data }: NDVISectionProps) {
             </Box>
           )}
         </Box>
-      </Box>
+      </Box>}
     </VStack>
   );
 }
