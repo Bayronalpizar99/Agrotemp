@@ -16,3 +16,9 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Local AI tooling metadata
+**/.agents/
+**/.claude/
+.codex
+skills-lock.json

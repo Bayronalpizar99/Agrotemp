@@ -1,10 +1,18 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, Logger } from '@nestjs/common';
+
+const parseCorsOrigins = (rawOrigins?: string): string[] =>
+  (rawOrigins ?? '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0);
 
 async function bootstrap() {
+  const logger = new Logger('Bootstrap');
   const app = await NestFactory.create(AppModule);
-  
+  const isProduction = process.env.NODE_ENV === 'production';
+
   // Global prefix
   app.setGlobalPrefix('api');
 
@@ -16,8 +24,32 @@ async function bootstrap() {
   }));
 
   // CORS Configuration
+  const configuredOrigins = parseCorsOrigins(process.env.CORS_ORIGIN);
+  const defaultDevOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173'];
+  const allowedOrigins =
+    configuredOrigins.length > 0 ? configuredOrigins : defaultDevOrigins;
+
+  if (isProduction && configuredOrigins.length === 0) {
+    throw new Error(
+      'CORS_ORIGIN debe configurarse en producción (lista separada por comas).',
+    );
+  }
+
+  if (isProduction && allowedOrigins.includes('*')) {
+    throw new Error(
+      'CORS_ORIGIN no puede ser "*" en producción cuando credentials=true.',
+    );
+  }
+
   app.enableCors({
-    origin: process.env.NODE_ENV === 'production' ? '*' : ['http://localhost:5173', 'http://127.0.0.1:5173'], // En producción permite todo, o pon aquí tu URL de Vercel
+    origin: (origin, callback) => {
+      // Permite requests sin origin (curl/health checks/server-to-server).
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error(`Origen no permitido por CORS: ${origin}`), false);
+    },
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     allowedHeaders: ['Content-Type', 'Accept', 'Authorization'],
     exposedHeaders: ['Content-Disposition'],
@@ -26,16 +58,19 @@ async function bootstrap() {
 
   const port = process.env.PORT ?? 5000;
 
-  // Log middleware para todas las solicitudes
+  // Log middleware sin exponer headers ni query params sensibles.
   app.use((req, res, next) => {
-    console.log(`\n📨 ${new Date().toISOString()} - ${req.method} ${req.url}`);
-    console.log('Query params:', req.query);
-    console.log('Headers:', req.headers);
+    const startTime = Date.now();
+    res.on('finish', () => {
+      logger.log(
+        `${req.method} ${req.path} -> ${res.statusCode} (${Date.now() - startTime}ms)`,
+      );
+    });
     next();
   });
   
   await app.listen(port, () => {
-    console.log(`
+    logger.log(`
 ==========================================================
 🚀 Servidor iniciado en http://localhost:${port}
 📁 Rutas disponibles:
