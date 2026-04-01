@@ -27,11 +27,12 @@ export const satelliteService = {
   // el backend calcula las estadísticas solo sobre los píxeles dentro del polígono.
   getNDVI: async (bbox: number[], from: string, to: string, geometry?: [number, number][]): Promise<NDVIResult> => {
     const params = new URLSearchParams({ bbox: bbox.join(','), from, to });
-    if (geometry && geometry.length >= 3) {
-      params.set('geometry', JSON.stringify(geometry));
-    }
 
-    const response = await fetch(`${API_URL}/ndvi?${params}`);
+    const response = await fetch(`${API_URL}/ndvi?${params}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: geometry && geometry.length >= 3 ? JSON.stringify({ geometry }) : '{}',
+    });
 
     if (!response.ok) {
       let errorMessage = 'Error al obtener datos NDVI';

@@ -1,5 +1,5 @@
-import { Controller, Get, Query, Res, HttpException, HttpStatus } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
+import { Controller, Get, Post, Query, Body, Res, HttpException, HttpStatus } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiQuery, ApiBody } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { SatelliteService } from './satellite.service';
 
@@ -8,17 +8,17 @@ import { SatelliteService } from './satellite.service';
 export class SatelliteController {
   constructor(private readonly satelliteService: SatelliteService) {}
 
-  @Get('ndvi')
+  @Post('ndvi')
   @ApiOperation({ summary: 'Obtener estadísticas NDVI de Sentinel-2 para un área y periodo' })
   @ApiQuery({ name: 'bbox', required: true, example: '-84.15,10.00,-84.10,10.05', description: 'Bounding box: minLon,minLat,maxLon,maxLat' })
   @ApiQuery({ name: 'from', required: true, example: '2026-01-01' })
   @ApiQuery({ name: 'to', required: true, example: '2026-01-31' })
-  @ApiQuery({ name: 'geometry', required: false, description: 'Polígono GeoJSON como JSON: [[lng,lat],[lng,lat],...]' })
+  @ApiBody({ required: false, description: 'Polígono GeoJSON opcional para estadísticas precisas', schema: { type: 'object', properties: { geometry: { type: 'array', items: { type: 'array', items: { type: 'number' } }, description: '[[lng,lat], ...] — mínimo 3 puntos' } } } })
   async getNDVI(
     @Query('bbox') bboxStr: string,
     @Query('from') from: string,
     @Query('to') to: string,
-    @Query('geometry') geometryStr?: string,
+    @Body() body?: { geometry?: [number, number][] },
   ) {
     if (!bboxStr || !from || !to) {
       throw new HttpException('bbox, from y to son requeridos', HttpStatus.BAD_REQUEST);
@@ -29,14 +29,15 @@ export class SatelliteController {
       throw new HttpException('bbox debe tener 4 valores numéricos: minLon,minLat,maxLon,maxLat', HttpStatus.BAD_REQUEST);
     }
 
-    let geometry: number[][] | undefined;
-    if (geometryStr) {
-      try {
-        geometry = JSON.parse(geometryStr);
-        if (!Array.isArray(geometry) || geometry.length < 3) geometry = undefined;
-      } catch {
-        geometry = undefined;
+    let geometry: [number, number][] | undefined;
+    if (body?.geometry) {
+      if (!Array.isArray(body.geometry) || body.geometry.length < 3) {
+        throw new HttpException('geometry debe ser un array de al menos 3 pares [lng,lat]', HttpStatus.BAD_REQUEST);
       }
+      if (body.geometry.some(p => !Array.isArray(p) || p.length !== 2 || p.some(isNaN))) {
+        throw new HttpException('Cada punto de geometry debe ser un par numérico [lng, lat]', HttpStatus.BAD_REQUEST);
+      }
+      geometry = body.geometry;
     }
 
     try {
@@ -44,7 +45,7 @@ export class SatelliteController {
       return { success: true, data };
     } catch (error) {
       throw new HttpException(
-        { success: false, message: error.message || 'Error al obtener datos NDVI' },
+        { success: false, message: error instanceof Error ? error.message : 'Error al obtener datos NDVI' },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }

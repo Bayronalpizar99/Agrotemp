@@ -303,6 +303,14 @@ export function ParcelasPage({ isActive = false }: { isActive?: boolean }) {
   useEffect(() => { toRef.current = to; }, [to]);
   useEffect(() => { layerModeRef.current = layerMode; }, [layerMode]);
 
+  useEffect(() => {
+    return () => {
+      if (prevBlobRef.current.startsWith('blob:')) {
+        URL.revokeObjectURL(prevBlobRef.current);
+      }
+    };
+  }, []);
+
   const fetchOverlay = useCallback(async (bbox: number[]) => {
     if (layerModeRef.current !== 'ndvi') return;
     setImageLoading(true);

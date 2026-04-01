@@ -121,6 +121,7 @@ export class SatelliteService {
             type: 'Polygon',
             coordinates: [[...geometry, geometry[0]]], // cerrar el anillo
           },
+          properties: { crs: 'http://www.opengis.net/def/crs/EPSG/0/4326' },
         }
       : {
           bbox,
