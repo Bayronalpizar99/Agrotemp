@@ -513,33 +513,42 @@ export const AgroReportPage = () => {
                                 </Text>
                                 <Divider borderColor="whiteAlpha.300" />
                                 
-                                <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} spacing={3}>
-                                    <MetricCard 
-                                      label="GDD" 
-                                      value={msg.reportData.metrics.gdd} 
-                                      unit="°D" 
-                                      icon={FiSun} 
-                                      color="orange.300" 
+                                <SimpleGrid columns={{ base: 1, md: 2, lg: msg.reportData.metrics.humidity ? 5 : 4 }} spacing={3}>
+                                    <MetricCard
+                                      label="GDD"
+                                      value={msg.reportData.metrics.gdd}
+                                      unit="°D"
+                                      icon={FiSun}
+                                      color="orange.300"
                                     />
-                                    <MetricCard 
-                                      label="Balance Hídrico" 
-                                      value={msg.reportData.metrics.waterBalance.balance} 
-                                      unit="mm" 
-                                      icon={FiDroplet} 
-                                      color="blue.300" 
+                                    <MetricCard
+                                      label="Balance Hídrico"
+                                      value={msg.reportData.metrics.waterBalance.balance}
+                                      unit="mm"
+                                      icon={FiDroplet}
+                                      color="blue.300"
                                     />
-                                    <MetricCard 
-                                      label="Estrés Calor" 
-                                      value={msg.reportData.metrics.stressHours ? msg.reportData.metrics.stressHours.heatStressHours : 0} 
-                                      unit="hrs" 
-                                      icon={FiThermometer} 
-                                      color="red.300" 
+                                    <MetricCard
+                                      label="Estrés Calor"
+                                      value={msg.reportData.metrics.stressHours ? msg.reportData.metrics.stressHours.heatStressHours : 0}
+                                      unit="hrs"
+                                      icon={FiThermometer}
+                                      color="red.300"
                                     />
-                                    <MetricCard 
-                                      label="Riesgo Enf." 
-                                      value={msg.reportData.metrics.diseaseRisk} 
-                                      icon={FiAlertCircle} 
-                                      color={msg.reportData.metrics.diseaseRisk === 'ALTO' ? 'red.500' : 'green.400'} 
+                                    {msg.reportData.metrics.humidity && (
+                                      <MetricCard
+                                        label="Humedad Prom."
+                                        value={msg.reportData.metrics.humidity.avg}
+                                        unit="%"
+                                        icon={FiDroplet}
+                                        color="cyan.300"
+                                      />
+                                    )}
+                                    <MetricCard
+                                      label="Riesgo Enf."
+                                      value={msg.reportData.metrics.diseaseRisk}
+                                      icon={FiAlertCircle}
+                                      color={msg.reportData.metrics.diseaseRisk === 'ALTO' ? 'red.500' : 'green.400'}
                                     />
                                 </SimpleGrid>
 

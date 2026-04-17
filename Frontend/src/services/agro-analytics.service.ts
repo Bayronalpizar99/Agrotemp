@@ -45,6 +45,12 @@ export type AgroReportResult = {
     waterBalance: WaterBalance;
     diseaseRisk: string;
     eto?: number;
+    humidity?: {
+      avg: number;
+      min: number;
+      max: number;
+      highHoursCount: number;
+    } | null;
   };
   chartData: ChartPoint[];
   aiAnalysis: string;

@@ -36,10 +36,10 @@ export class AgroAnalyticsService {
   async generateReport(params: AgroReportParams) {
     const { startDate, endDate, cropBaseTemp, cropMaxTemp } = params;
 
-    // 1. Obtener datos históricos y ETo de Open-Meteo en paralelo para ocultar latencia
-    const [rawData, openMeteoEto] = await Promise.all([
+    // 1. Obtener datos históricos y datos Open-Meteo en paralelo
+    const [rawData, { eto: openMeteoEto, humidity: openMeteoHumidity }] = await Promise.all([
       this.weatherService.getHourlyWeatherByDateRange(startDate, endDate),
-      this.fetchOpenMeteoEto(startDate, endDate),
+      this.fetchOpenMeteoData(startDate, endDate),
     ]);
 
     if (!rawData || rawData.length === 0) {
@@ -51,21 +51,25 @@ export class AgroAnalyticsService {
     } else {
       this.logger.warn('Open-Meteo no disponible, usando fallback Hargreaves-Samani.');
     }
+    if (openMeteoHumidity !== null) {
+      this.logger.log(`Humedad promedio Open-Meteo: ${openMeteoHumidity.avg}%`);
+    }
 
-    // 3. Calcular Métricas Agronómicas
+    // 2. Calcular Métricas Agronómicas
     const metrics = {
       gdd: this.calculateGDD(rawData, cropBaseTemp),
       stressHours: this.calculateStressHours(rawData, cropBaseTemp, cropMaxTemp),
       waterBalance: this.calculateWaterBalance(rawData, openMeteoEto ?? undefined),
       eto: openMeteoEto ?? this.calculateEto(rawData),
-      diseaseRisk: this.estimateDiseaseRisk(rawData),
+      humidity: openMeteoHumidity,
+      diseaseRisk: this.estimateDiseaseRisk(rawData, openMeteoHumidity ?? undefined),
       optimalWindows: this.findOptimalWindows(rawData)
     };
 
     // 3. Generar Datos para Gráficos
     const chartData = this.generateChartData(rawData, cropBaseTemp);
 
-    // 4. Generar Análisis con IA (Integración con Gemini/GPT)
+    // 4. Generar Análisis con IA
     const etoSource = openMeteoEto !== null
       ? 'ETo FAO Penman-Monteith vía Open-Meteo'
       : 'ETo estimada (Hargreaves-Samani)';
@@ -189,10 +193,13 @@ export class AgroAnalyticsService {
   }
 
   /**
-   * Obtiene la ETo diaria acumulada desde la API Open-Meteo (FAO Penman-Monteith).
-   * Retorna el total en mm, o null si la API no está disponible.
+   * Obtiene ETo y humedad relativa desde Open-Meteo en una sola llamada.
    */
-  private async fetchOpenMeteoEto(startDate: string, endDate: string): Promise<number | null> {
+  private async fetchOpenMeteoData(startDate: string, endDate: string): Promise<{
+    eto: number | null;
+    humidity: { avg: number; min: number; max: number; highHoursCount: number } | null;
+  }> {
+    const empty = { eto: null, humidity: null };
     try {
       const url = new URL('https://archive-api.open-meteo.com/v1/archive');
       url.searchParams.set('latitude', String(STATION_LAT));
@@ -200,23 +207,36 @@ export class AgroAnalyticsService {
       url.searchParams.set('start_date', startDate);
       url.searchParams.set('end_date', endDate);
       url.searchParams.set('daily', 'et0_fao_evapotranspiration');
+      url.searchParams.set('hourly', 'relative_humidity_2m');
       url.searchParams.set('timezone', 'America/Costa_Rica');
 
       const res = await fetch(url.toString(), { signal: AbortSignal.timeout(8000) });
       if (!res.ok) {
         this.logger.warn(`Open-Meteo respondió con status ${res.status}`);
-        return null;
+        return empty;
       }
 
       const data = await res.json();
-      const values: number[] = data?.daily?.et0_fao_evapotranspiration ?? [];
-      if (values.length === 0) return null;
 
-      const total = values.reduce((sum, v) => sum + (v ?? 0), 0);
-      return Number(total.toFixed(2));
+      // ETo acumulada
+      const etoValues: number[] = data?.daily?.et0_fao_evapotranspiration ?? [];
+      const eto = etoValues.length > 0
+        ? Number(etoValues.reduce((sum, v) => sum + (v ?? 0), 0).toFixed(2))
+        : null;
+
+      // Humedad relativa horaria
+      const humValues: number[] = (data?.hourly?.relative_humidity_2m ?? []).filter((v: any) => v != null);
+      const humidity = humValues.length > 0 ? {
+        avg: Number((humValues.reduce((s, v) => s + v, 0) / humValues.length).toFixed(1)),
+        min: Math.min(...humValues),
+        max: Math.max(...humValues),
+        highHoursCount: humValues.filter(v => v > 85).length,
+      } : null;
+
+      return { eto, humidity };
     } catch (err) {
       this.logger.warn(`Error al consultar Open-Meteo: ${err?.message ?? err}`);
-      return null;
+      return empty;
     }
   }
 
@@ -254,9 +274,22 @@ export class AgroAnalyticsService {
   }
 
   /**
-   * Estimación básica de riesgo de enfermedades fúngicas
+   * Riesgo de enfermedades fúngicas.
+   * Si hay datos de humedad (Open-Meteo), usa HR como indicador principal.
+   * Si no, fallback a lógica lluvia + temperatura.
    */
-  private estimateDiseaseRisk(data: HourlyWeatherData[]): string {
+  private estimateDiseaseRisk(
+    data: HourlyWeatherData[],
+    humidity?: { avg: number; highHoursCount: number },
+  ): string {
+    if (humidity) {
+      const highHumRatio = humidity.highHoursCount / (data.length || 1);
+      if (humidity.avg > 85 || highHumRatio > 0.5) return 'ALTO';
+      if (humidity.avg > 70 || highHumRatio > 0.25) return 'MEDIO';
+      return 'BAJO';
+    }
+
+    // Fallback: lógica original basada en lluvia y temperatura
     const dailyData = this.groupByDay(data);
     let riskyDays = 0;
 
@@ -265,11 +298,11 @@ export class AgroAnalyticsService {
           const t = d.Temp !== undefined ? d.Temp : (d as any).Temperatura;
           return typeof t === 'number' ? t : parseFloat(t) || 0;
       });
-      
+
       if (temps.length === 0) return;
 
       const avgTemp = temps.reduce((sum, t) => sum + t, 0) / temps.length;
-      
+
       const totalRain = dayHours.reduce((sum, d) => {
           const p = d.Precip !== undefined ? d.Precip : (d as any).Lluvia;
           return sum + (typeof p === 'number' ? p : parseFloat(p) || 0);
@@ -377,6 +410,7 @@ export class AgroAnalyticsService {
           - Lluvia Total: ${metrics.waterBalance.totalInput} mm
           - Evapotranspiración (${etoSource}): ${metrics.waterBalance.totalOutput} mm
           - Balance Hídrico (Lluvia − ETo): ${metrics.waterBalance.balance} mm
+          ${metrics.humidity ? `- Humedad Relativa Promedio: ${metrics.humidity.avg}%\n          - Humedad Relativa Mínima / Máxima: ${metrics.humidity.min}% / ${metrics.humidity.max}%\n          - Horas con HR > 85% (humedad alta): ${metrics.humidity.highHoursCount} hrs` : ''}
           - Riesgo de Enfermedades Fúngicas: ${metrics.diseaseRisk}
           - Horas favorables para pulverización (viento < 10 km/h, sin lluvia): ${metrics.optimalWindows.optimalSprayHours} hrs
 
