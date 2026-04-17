@@ -148,7 +148,7 @@ export class WeatherService {
             return {
                 ...data,
                 Temp: typeof data.Temp === 'number' ? parseFloat(data.Temp.toFixed(2)) : data.Temp,
-                Lluvia: typeof data.Lluvia === 'number' ? parseFloat(data.Lluvia.toFixed(2)) : data.Lluvia,
+                Lluvia: parseFloat(((typeof data.Lluvia === 'number' ? data.Lluvia : parseFloat(data.Lluvia) || 0) / 100).toFixed(2)),
                 fecha: fecha,
                 timestamp_extraccion_lote: data.timestamp_extraccion_lote // Mantener referencia original
             } as HourlyWeatherData;

@@ -4,6 +4,10 @@ import { HourlyWeatherData } from '../weather/interfaces/hourly-weather.interfac
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { ConfigService } from '@nestjs/config';
 
+// Coordenadas de la estación meteorológica — ITCR Santa Clara, Alajuela
+const STATION_LAT = 10.364214;
+const STATION_LNG = -84.507275;
+
 export interface AgroReportParams {
   startDate: string;    // YYYY-MM-DD
   endDate: string;      // YYYY-MM-DD
@@ -32,22 +36,28 @@ export class AgroAnalyticsService {
   async generateReport(params: AgroReportParams) {
     const { startDate, endDate, cropBaseTemp, cropMaxTemp } = params;
 
-    // 1. Obtener datos históricos
-    // Nota: Asumimos que getHourlyWeatherByDateRange devuelve un array de HourlyWeatherData
-    // Si la implementación actual en WeatherService falla por formato de fecha, 
-    // necesitaremos ajustar ese método primero.
-    const rawData = await this.weatherService.getHourlyWeatherByDateRange(startDate, endDate);
-    
+    // 1. Obtener datos históricos y ETo de Open-Meteo en paralelo para ocultar latencia
+    const [rawData, openMeteoEto] = await Promise.all([
+      this.weatherService.getHourlyWeatherByDateRange(startDate, endDate),
+      this.fetchOpenMeteoEto(startDate, endDate),
+    ]);
+
     if (!rawData || rawData.length === 0) {
       throw new Error(`No se encontraron datos para el rango ${startDate} - ${endDate}`);
     }
 
-    // 2. Calcular Métricas Agronómicas
+    if (openMeteoEto !== null) {
+      this.logger.log(`ETo obtenida de Open-Meteo: ${openMeteoEto} mm`);
+    } else {
+      this.logger.warn('Open-Meteo no disponible, usando fallback Hargreaves-Samani.');
+    }
+
+    // 3. Calcular Métricas Agronómicas
     const metrics = {
       gdd: this.calculateGDD(rawData, cropBaseTemp),
       stressHours: this.calculateStressHours(rawData, cropBaseTemp, cropMaxTemp),
-      waterBalance: this.calculateWaterBalance(rawData),
-      eto: this.calculateEto(rawData), // Evapotranspiración simplificada
+      waterBalance: this.calculateWaterBalance(rawData, openMeteoEto ?? undefined),
+      eto: openMeteoEto ?? this.calculateEto(rawData),
       diseaseRisk: this.estimateDiseaseRisk(rawData),
       optimalWindows: this.findOptimalWindows(rawData)
     };
@@ -56,7 +66,10 @@ export class AgroAnalyticsService {
     const chartData = this.generateChartData(rawData, cropBaseTemp);
 
     // 4. Generar Análisis con IA (Integración con Gemini/GPT)
-    const aiAnalysis = await this.callGenerativeAI(metrics, params);
+    const etoSource = openMeteoEto !== null
+      ? 'ETo FAO Penman-Monteith vía Open-Meteo'
+      : 'ETo estimada (Hargreaves-Samani)';
+    const aiAnalysis = await this.callGenerativeAI(metrics, params, etoSource);
 
     return {
       period: { startDate, endDate },
@@ -156,16 +169,17 @@ export class AgroAnalyticsService {
   }
 
   /**
-   * Balance Hídrico simple: Lluvia acumulada vs ETo acumulada
+   * Balance Hídrico: Lluvia acumulada vs ETo.
+   * Si se provee externalEto (de Open-Meteo), se usa directamente.
+   * Si no, hace fallback al cálculo Hargreaves-Samani interno.
    */
-  private calculateWaterBalance(data: HourlyWeatherData[]) {
+  private calculateWaterBalance(data: HourlyWeatherData[], externalEto?: number) {
     const totalRain = data.reduce((sum, d) => {
         const p = d.Precip !== undefined ? d.Precip : (d as any).Lluvia;
         return sum + (typeof p === 'number' ? p : parseFloat(p) || 0);
     }, 0);
 
-    // ETo simplificada (ver método abajo)
-    const totalEto = this.calculateEto(data); 
+    const totalEto = externalEto ?? this.calculateEto(data);
 
     return {
       totalInput: Number(totalRain.toFixed(2)),
@@ -175,7 +189,40 @@ export class AgroAnalyticsService {
   }
 
   /**
-   * Estimación simplificada de Evapotranspiración (Hargreaves-Samani)
+   * Obtiene la ETo diaria acumulada desde la API Open-Meteo (FAO Penman-Monteith).
+   * Retorna el total en mm, o null si la API no está disponible.
+   */
+  private async fetchOpenMeteoEto(startDate: string, endDate: string): Promise<number | null> {
+    try {
+      const url = new URL('https://archive-api.open-meteo.com/v1/archive');
+      url.searchParams.set('latitude', String(STATION_LAT));
+      url.searchParams.set('longitude', String(STATION_LNG));
+      url.searchParams.set('start_date', startDate);
+      url.searchParams.set('end_date', endDate);
+      url.searchParams.set('daily', 'et0_fao_evapotranspiration');
+      url.searchParams.set('timezone', 'America/Costa_Rica');
+
+      const res = await fetch(url.toString(), { signal: AbortSignal.timeout(8000) });
+      if (!res.ok) {
+        this.logger.warn(`Open-Meteo respondió con status ${res.status}`);
+        return null;
+      }
+
+      const data = await res.json();
+      const values: number[] = data?.daily?.et0_fao_evapotranspiration ?? [];
+      if (values.length === 0) return null;
+
+      const total = values.reduce((sum, v) => sum + (v ?? 0), 0);
+      return Number(total.toFixed(2));
+    } catch (err) {
+      this.logger.warn(`Error al consultar Open-Meteo: ${err?.message ?? err}`);
+      return null;
+    }
+  }
+
+  /**
+   * Fallback: Estimación de ETo con Hargreaves-Samani.
+   * Solo se usa cuando Open-Meteo no está disponible.
    */
   private calculateEto(data: HourlyWeatherData[]): number {
     const dailyData = this.groupByDay(data);
@@ -299,7 +346,7 @@ export class AgroAnalyticsService {
   }
 
   // --- Integración con Google Gemini ---
-  private async callGenerativeAI(metrics: any, params: AgroReportParams): Promise<string> {
+  private async callGenerativeAI(metrics: any, params: AgroReportParams, etoSource = 'ETo estimada'): Promise<string> {
     const { cropBaseTemp, cropMaxTemp, cropName } = params;
     const cropLabel = cropName ? `cultivo de referencia: ${cropName}` : 'cultivo no especificado';
 
@@ -328,7 +375,7 @@ export class AgroAnalyticsService {
           - Horas con temperatura > ${cropMaxTemp}°C (estrés por calor): ${metrics.stressHours.heatStressHours} hrs
           - Horas con temperatura < ${cropBaseTemp}°C (estrés por frío): ${metrics.stressHours.coldStressHours} hrs
           - Lluvia Total: ${metrics.waterBalance.totalInput} mm
-          - Evapotranspiración estimada (ETo): ${metrics.waterBalance.totalOutput} mm
+          - Evapotranspiración (${etoSource}): ${metrics.waterBalance.totalOutput} mm
           - Balance Hídrico (Lluvia − ETo): ${metrics.waterBalance.balance} mm
           - Riesgo de Enfermedades Fúngicas: ${metrics.diseaseRisk}
           - Horas favorables para pulverización (viento < 10 km/h, sin lluvia): ${metrics.optimalWindows.optimalSprayHours} hrs

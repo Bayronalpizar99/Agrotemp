@@ -86,7 +86,7 @@ export class ExcelController {
                 return {
                     Fecha: data.Fecha,
                     Temp: typeof data.Temp === 'number' ? data.Temp : parseFloat(data.Temp),
-                    Lluvia: typeof data.Lluvia === 'number' ? data.Lluvia : parseFloat(data.Lluvia),
+                    Lluvia: typeof data.Lluvia === 'number' ? parseFloat((data.Lluvia / 100).toFixed(2)) : parseFloat(data.Lluvia) / 100,
                     Rad_max: data.Rad_max,
                     // Campo auxiliar para ordenar/filtrar
                     _timestamp: parseCustomDate(data.Fecha)
