@@ -232,7 +232,7 @@ export class WeatherService {
         endDate: string,
     ): Promise<{ avg: number; min: number; max: number; highHoursCount: number } | null> {
         try {
-            // Mismos límites de rango que getHourlyWeatherByDateRange para consistencia
+            // Límites exactos del rango (para el filtrado en memoria)
             const startLimit = new Date(startDate);
             startLimit.setHours(0, 0, 0, 0);
 
@@ -240,11 +240,18 @@ export class WeatherService {
             endLimit.setDate(endLimit.getDate() + 1);
             endLimit.setMilliseconds(-1);
 
-            // Filtrar directamente en Firestore por rango — sin .limit() para no truncar periodos largos
+            // Buffer de 12h para cubrir diferencia de zona horaria:
+            // Cloud Run almacena en UTC, Costa Rica es UTC-6.
+            // Un registro del 17 abril 19:43 local = 18 abril 01:43 UTC → quedaría
+            // fuera de un filtro "hasta 17 abril 23:59 UTC" sin este ajuste.
+            const BUFFER_MS = 12 * 60 * 60 * 1000;
+            const queryStart = new Date(startLimit.getTime() - BUFFER_MS);
+            const queryEnd   = new Date(endLimit.getTime()   + BUFFER_MS);
+
             const snapshot = await this.firestore
                 .collection('datos_actuales')
-                .where('timestamp_extraccion', '>=', startLimit)
-                .where('timestamp_extraccion', '<=', endLimit)
+                .where('timestamp_extraccion', '>=', queryStart)
+                .where('timestamp_extraccion', '<=', queryEnd)
                 .get();
 
             if (snapshot.empty) return null;
@@ -259,11 +266,16 @@ export class WeatherService {
                 const hr = data.HR;
                 if (typeof hr !== 'number' || isNaN(hr)) return;
 
-                const t: Date = typeof data.timestamp_extraccion?.toDate === 'function'
+                const utc: Date = typeof data.timestamp_extraccion?.toDate === 'function'
                     ? data.timestamp_extraccion.toDate()
                     : new Date(data.timestamp_extraccion);
 
-                const hourKey = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')} ${String(t.getHours()).padStart(2, '0')}`;
+                // Verificar que el registro cae dentro del rango exacto (filtro en memoria)
+                if (utc.getTime() < startLimit.getTime() || utc.getTime() > endLimit.getTime()) return;
+
+                // Convertir a hora local de Costa Rica (UTC-6) para agrupar por hora correctamente
+                const local = new Date(utc.getTime() - 6 * 60 * 60 * 1000);
+                const hourKey = `${local.getUTCFullYear()}-${String(local.getUTCMonth() + 1).padStart(2, '0')}-${String(local.getUTCDate()).padStart(2, '0')} ${String(local.getUTCHours()).padStart(2, '0')}`;
                 if (!hourlyBuckets.has(hourKey)) hourlyBuckets.set(hourKey, []);
                 hourlyBuckets.get(hourKey)!.push(hr);
             });
@@ -300,10 +312,14 @@ export class WeatherService {
             endLimit.setDate(endLimit.getDate() + 1);
             endLimit.setMilliseconds(-1);
 
+            const BUFFER_MS = 12 * 60 * 60 * 1000;
+            const queryStart = new Date(startLimit.getTime() - BUFFER_MS);
+            const queryEnd   = new Date(endLimit.getTime()   + BUFFER_MS);
+
             const snapshot = await this.firestore
                 .collection('datos_actuales')
-                .where('timestamp_extraccion', '>=', startLimit)
-                .where('timestamp_extraccion', '<=', endLimit)
+                .where('timestamp_extraccion', '>=', queryStart)
+                .where('timestamp_extraccion', '<=', queryEnd)
                 .get();
 
             if (snapshot.empty) return null;
@@ -326,11 +342,15 @@ export class WeatherService {
                 // Requiere al menos un campo de velocidad para ser útil
                 if (velocidad === null) return;
 
-                const t: Date = typeof data.timestamp_extraccion?.toDate === 'function'
+                const utc: Date = typeof data.timestamp_extraccion?.toDate === 'function'
                     ? data.timestamp_extraccion.toDate()
                     : new Date(data.timestamp_extraccion);
 
-                const hourKey = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')} ${String(t.getHours()).padStart(2, '0')}`;
+                // Filtro exacto en memoria y agrupado en hora local Costa Rica (UTC-6)
+                if (utc.getTime() < startLimit.getTime() || utc.getTime() > endLimit.getTime()) return;
+
+                const local = new Date(utc.getTime() - 6 * 60 * 60 * 1000);
+                const hourKey = `${local.getUTCFullYear()}-${String(local.getUTCMonth() + 1).padStart(2, '0')}-${String(local.getUTCDate()).padStart(2, '0')} ${String(local.getUTCHours()).padStart(2, '0')}`;
 
                 if (!buckets.has(hourKey)) buckets.set(hourKey, { velocidades: [], hrs: [] });
                 buckets.get(hourKey)!.velocidades.push(velocidad);
