@@ -232,33 +232,30 @@ export class WeatherService {
         endDate: string,
     ): Promise<{ avg: number; min: number; max: number; highHoursCount: number } | null> {
         try {
-            // Límites exactos del rango (para el filtrado en memoria)
-            const startLimit = new Date(startDate);
-            startLimit.setHours(0, 0, 0, 0);
+            // Cloud Run almacena en UTC; Costa Rica es UTC-6.
+            // "17 abril 00:00 CR" = "17 abril 06:00 UTC"
+            // "17 abril 23:59 CR" = "18 abril 05:59 UTC"
+            // → sumar 6h a los límites para obtener el equivalente UTC del día CR.
+            const CR_OFFSET_MS = 6 * 60 * 60 * 1000;
 
-            const endLimit = new Date(endDate);
-            endLimit.setDate(endLimit.getDate() + 1);
-            endLimit.setMilliseconds(-1);
+            const startCR = new Date(startDate);
+            startCR.setHours(0, 0, 0, 0);
+            const startUTC = new Date(startCR.getTime() + CR_OFFSET_MS);
 
-            // Buffer de 12h para cubrir diferencia de zona horaria:
-            // Cloud Run almacena en UTC, Costa Rica es UTC-6.
-            // Un registro del 17 abril 19:43 local = 18 abril 01:43 UTC → quedaría
-            // fuera de un filtro "hasta 17 abril 23:59 UTC" sin este ajuste.
-            const BUFFER_MS = 12 * 60 * 60 * 1000;
-            const queryStart = new Date(startLimit.getTime() - BUFFER_MS);
-            const queryEnd   = new Date(endLimit.getTime()   + BUFFER_MS);
+            const endCR = new Date(endDate);
+            endCR.setDate(endCR.getDate() + 1);
+            endCR.setMilliseconds(-1);
+            const endUTC = new Date(endCR.getTime() + CR_OFFSET_MS);
 
             const snapshot = await this.firestore
                 .collection('datos_actuales')
-                .where('timestamp_extraccion', '>=', queryStart)
-                .where('timestamp_extraccion', '<=', queryEnd)
+                .where('timestamp_extraccion', '>=', startUTC)
+                .where('timestamp_extraccion', '<=', endUTC)
                 .get();
 
             if (snapshot.empty) return null;
 
-            // Agrupar muestras por hora (YYYY-MM-DD HH) antes de contar highHoursCount.
-            // datos_actuales puede tener varias muestras por hora (cada ~30 min),
-            // por lo que contar registros raw sobreestimaría las "horas" con HR alta.
+            // Agrupar muestras por hora local CR para evitar sobrecontar highHoursCount
             const hourlyBuckets = new Map<string, number[]>();
 
             snapshot.docs.forEach(doc => {
@@ -270,11 +267,8 @@ export class WeatherService {
                     ? data.timestamp_extraccion.toDate()
                     : new Date(data.timestamp_extraccion);
 
-                // Verificar que el registro cae dentro del rango exacto (filtro en memoria)
-                if (utc.getTime() < startLimit.getTime() || utc.getTime() > endLimit.getTime()) return;
-
-                // Convertir a hora local de Costa Rica (UTC-6) para agrupar por hora correctamente
-                const local = new Date(utc.getTime() - 6 * 60 * 60 * 1000);
+                // Convertir a hora local de Costa Rica (UTC-6) para la clave de agrupado
+                const local = new Date(utc.getTime() - CR_OFFSET_MS);
                 const hourKey = `${local.getUTCFullYear()}-${String(local.getUTCMonth() + 1).padStart(2, '0')}-${String(local.getUTCDate()).padStart(2, '0')} ${String(local.getUTCHours()).padStart(2, '0')}`;
                 if (!hourlyBuckets.has(hourKey)) hourlyBuckets.set(hourKey, []);
                 hourlyBuckets.get(hourKey)!.push(hr);
@@ -305,21 +299,24 @@ export class WeatherService {
         endDate: string,
     ): Promise<Record<string, { velocidad: number; hr: number }> | null> {
         try {
-            const startLimit = new Date(startDate);
-            startLimit.setHours(0, 0, 0, 0);
+            // Cloud Run almacena en UTC; Costa Rica es UTC-6.
+            // "17 abril 00:00 CR" = "17 abril 06:00 UTC"
+            // → sumar 6h a los límites para obtener el equivalente UTC del día CR.
+            const CR_OFFSET_MS = 6 * 60 * 60 * 1000;
 
-            const endLimit = new Date(endDate);
-            endLimit.setDate(endLimit.getDate() + 1);
-            endLimit.setMilliseconds(-1);
+            const startCR = new Date(startDate);
+            startCR.setHours(0, 0, 0, 0);
+            const startUTC = new Date(startCR.getTime() + CR_OFFSET_MS);
 
-            const BUFFER_MS = 12 * 60 * 60 * 1000;
-            const queryStart = new Date(startLimit.getTime() - BUFFER_MS);
-            const queryEnd   = new Date(endLimit.getTime()   + BUFFER_MS);
+            const endCR = new Date(endDate);
+            endCR.setDate(endCR.getDate() + 1);
+            endCR.setMilliseconds(-1);
+            const endUTC = new Date(endCR.getTime() + CR_OFFSET_MS);
 
             const snapshot = await this.firestore
                 .collection('datos_actuales')
-                .where('timestamp_extraccion', '>=', queryStart)
-                .where('timestamp_extraccion', '<=', queryEnd)
+                .where('timestamp_extraccion', '>=', startUTC)
+                .where('timestamp_extraccion', '<=', endUTC)
                 .get();
 
             if (snapshot.empty) return null;
@@ -346,10 +343,8 @@ export class WeatherService {
                     ? data.timestamp_extraccion.toDate()
                     : new Date(data.timestamp_extraccion);
 
-                // Filtro exacto en memoria y agrupado en hora local Costa Rica (UTC-6)
-                if (utc.getTime() < startLimit.getTime() || utc.getTime() > endLimit.getTime()) return;
-
-                const local = new Date(utc.getTime() - 6 * 60 * 60 * 1000);
+                // Agrupar en hora local Costa Rica (UTC-6)
+                const local = new Date(utc.getTime() - CR_OFFSET_MS);
                 const hourKey = `${local.getUTCFullYear()}-${String(local.getUTCMonth() + 1).padStart(2, '0')}-${String(local.getUTCDate()).padStart(2, '0')} ${String(local.getUTCHours()).padStart(2, '0')}`;
 
                 if (!buckets.has(hourKey)) buckets.set(hourKey, { velocidades: [], hrs: [] });
