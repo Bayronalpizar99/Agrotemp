@@ -36,10 +36,11 @@ export class AgroAnalyticsService {
   async generateReport(params: AgroReportParams) {
     const { startDate, endDate, cropBaseTemp, cropMaxTemp } = params;
 
-    // 1. Obtener datos históricos y datos Open-Meteo en paralelo
-    const [rawData, { eto: openMeteoEto, humidity: openMeteoHumidity }] = await Promise.all([
+    // 1. Obtener datos históricos, ETo de Open-Meteo y HR de la estación en paralelo
+    const [rawData, openMeteoEto, stationHumidity] = await Promise.all([
       this.weatherService.getHourlyWeatherByDateRange(startDate, endDate),
-      this.fetchOpenMeteoData(startDate, endDate),
+      this.fetchOpenMeteoEto(startDate, endDate),
+      this.weatherService.getActualesHumidityByDateRange(startDate, endDate),
     ]);
 
     if (!rawData || rawData.length === 0) {
@@ -51,8 +52,10 @@ export class AgroAnalyticsService {
     } else {
       this.logger.warn('Open-Meteo no disponible, usando fallback Hargreaves-Samani.');
     }
-    if (openMeteoHumidity !== null) {
-      this.logger.log(`Humedad promedio Open-Meteo: ${openMeteoHumidity.avg}%`);
+    if (stationHumidity !== null) {
+      this.logger.log(`Humedad promedio de la estación: ${stationHumidity.avg}%`);
+    } else {
+      this.logger.warn('HR de estación no disponible para el rango solicitado.');
     }
 
     // 2. Calcular Métricas Agronómicas
@@ -61,8 +64,8 @@ export class AgroAnalyticsService {
       stressHours: this.calculateStressHours(rawData, cropBaseTemp, cropMaxTemp),
       waterBalance: this.calculateWaterBalance(rawData, openMeteoEto ?? undefined),
       eto: openMeteoEto ?? this.calculateEto(rawData),
-      humidity: openMeteoHumidity,
-      diseaseRisk: this.estimateDiseaseRisk(rawData, openMeteoHumidity ?? undefined),
+      humidity: stationHumidity,
+      diseaseRisk: this.estimateDiseaseRisk(rawData, stationHumidity ?? undefined),
       optimalWindows: this.findOptimalWindows(rawData)
     };
 
@@ -73,7 +76,8 @@ export class AgroAnalyticsService {
     const etoSource = openMeteoEto !== null
       ? 'ETo FAO Penman-Monteith vía Open-Meteo'
       : 'ETo estimada (Hargreaves-Samani)';
-    const aiAnalysis = await this.callGenerativeAI(metrics, params, etoSource);
+    const humiditySource = stationHumidity !== null ? ' (estación meteorológica)' : '';
+    const aiAnalysis = await this.callGenerativeAI(metrics, params, etoSource, humiditySource);
 
     return {
       period: { startDate, endDate },
@@ -193,13 +197,10 @@ export class AgroAnalyticsService {
   }
 
   /**
-   * Obtiene ETo y humedad relativa desde Open-Meteo en una sola llamada.
+   * Obtiene la ETo acumulada del período desde Open-Meteo (FAO Penman-Monteith).
+   * Retorna null si la API no está disponible → se activa el fallback Hargreaves-Samani.
    */
-  private async fetchOpenMeteoData(startDate: string, endDate: string): Promise<{
-    eto: number | null;
-    humidity: { avg: number; min: number; max: number; highHoursCount: number } | null;
-  }> {
-    const empty = { eto: null, humidity: null };
+  private async fetchOpenMeteoEto(startDate: string, endDate: string): Promise<number | null> {
     try {
       const url = new URL('https://archive-api.open-meteo.com/v1/archive');
       url.searchParams.set('latitude', String(STATION_LAT));
@@ -207,36 +208,22 @@ export class AgroAnalyticsService {
       url.searchParams.set('start_date', startDate);
       url.searchParams.set('end_date', endDate);
       url.searchParams.set('daily', 'et0_fao_evapotranspiration');
-      url.searchParams.set('hourly', 'relative_humidity_2m');
       url.searchParams.set('timezone', 'America/Costa_Rica');
 
       const res = await fetch(url.toString(), { signal: AbortSignal.timeout(8000) });
       if (!res.ok) {
         this.logger.warn(`Open-Meteo respondió con status ${res.status}`);
-        return empty;
+        return null;
       }
 
       const data = await res.json();
-
-      // ETo acumulada
       const etoValues: number[] = data?.daily?.et0_fao_evapotranspiration ?? [];
-      const eto = etoValues.length > 0
+      return etoValues.length > 0
         ? Number(etoValues.reduce((sum, v) => sum + (v ?? 0), 0).toFixed(2))
         : null;
-
-      // Humedad relativa horaria
-      const humValues: number[] = (data?.hourly?.relative_humidity_2m ?? []).filter((v: any) => v != null);
-      const humidity = humValues.length > 0 ? {
-        avg: Number((humValues.reduce((s, v) => s + v, 0) / humValues.length).toFixed(1)),
-        min: Math.min(...humValues),
-        max: Math.max(...humValues),
-        highHoursCount: humValues.filter(v => v > 85).length,
-      } : null;
-
-      return { eto, humidity };
     } catch (err) {
       this.logger.warn(`Error al consultar Open-Meteo: ${err?.message ?? err}`);
-      return empty;
+      return null;
     }
   }
 
@@ -379,7 +366,7 @@ export class AgroAnalyticsService {
   }
 
   // --- Integración con Google Gemini ---
-  private async callGenerativeAI(metrics: any, params: AgroReportParams, etoSource = 'ETo estimada'): Promise<string> {
+  private async callGenerativeAI(metrics: any, params: AgroReportParams, etoSource = 'ETo estimada', humiditySource = ''): Promise<string> {
     const { cropBaseTemp, cropMaxTemp, cropName } = params;
     const cropLabel = cropName ? `cultivo de referencia: ${cropName}` : 'cultivo no especificado';
 
@@ -410,7 +397,7 @@ export class AgroAnalyticsService {
           - Lluvia Total: ${metrics.waterBalance.totalInput} mm
           - Evapotranspiración (${etoSource}): ${metrics.waterBalance.totalOutput} mm
           - Balance Hídrico (Lluvia − ETo): ${metrics.waterBalance.balance} mm
-          ${metrics.humidity ? `- Humedad Relativa Promedio: ${metrics.humidity.avg}%\n          - Humedad Relativa Mínima / Máxima: ${metrics.humidity.min}% / ${metrics.humidity.max}%\n          - Horas con HR > 85% (humedad alta): ${metrics.humidity.highHoursCount} hrs` : ''}
+          ${metrics.humidity ? `- Humedad Relativa Promedio${humiditySource}: ${metrics.humidity.avg}%\n          - Humedad Relativa Mínima / Máxima: ${metrics.humidity.min}% / ${metrics.humidity.max}%\n          - Horas con HR > 85% (humedad alta): ${metrics.humidity.highHoursCount} hrs` : ''}
           - Riesgo de Enfermedades Fúngicas: ${metrics.diseaseRisk}
           - Horas favorables para pulverización (viento < 10 km/h, sin lluvia): ${metrics.optimalWindows.optimalSprayHours} hrs
 

@@ -226,6 +226,67 @@ export class WeatherService {
         }
     }
 
+    // Obtener estadísticas de humedad relativa (HR) desde datos_actuales por rango de fechas
+    async getActualesHumidityByDateRange(
+        startDate: string,
+        endDate: string,
+    ): Promise<{ avg: number; min: number; max: number; highHoursCount: number } | null> {
+        try {
+            // Mismos límites de rango que getHourlyWeatherByDateRange para consistencia
+            const startLimit = new Date(startDate);
+            startLimit.setHours(0, 0, 0, 0);
+
+            const endLimit = new Date(endDate);
+            endLimit.setDate(endLimit.getDate() + 1);
+            endLimit.setMilliseconds(-1);
+
+            // Filtrar directamente en Firestore por rango — sin .limit() para no truncar periodos largos
+            const snapshot = await this.firestore
+                .collection('datos_actuales')
+                .where('timestamp_extraccion', '>=', startLimit)
+                .where('timestamp_extraccion', '<=', endLimit)
+                .get();
+
+            if (snapshot.empty) return null;
+
+            // Agrupar muestras por hora (YYYY-MM-DD HH) antes de contar highHoursCount.
+            // datos_actuales puede tener varias muestras por hora (cada ~30 min),
+            // por lo que contar registros raw sobreestimaría las "horas" con HR alta.
+            const hourlyBuckets = new Map<string, number[]>();
+
+            snapshot.docs.forEach(doc => {
+                const data = doc.data();
+                const hr = data.HR;
+                if (typeof hr !== 'number' || isNaN(hr)) return;
+
+                const t: Date = typeof data.timestamp_extraccion?.toDate === 'function'
+                    ? data.timestamp_extraccion.toDate()
+                    : new Date(data.timestamp_extraccion);
+
+                const hourKey = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')} ${String(t.getHours()).padStart(2, '0')}`;
+                if (!hourlyBuckets.has(hourKey)) hourlyBuckets.set(hourKey, []);
+                hourlyBuckets.get(hourKey)!.push(hr);
+            });
+
+            if (hourlyBuckets.size === 0) return null;
+
+            // Promedio de HR por hora
+            const hourlyAvgs = Array.from(hourlyBuckets.values()).map(
+                vals => vals.reduce((s, v) => s + v, 0) / vals.length,
+            );
+
+            return {
+                avg: Number((hourlyAvgs.reduce((s, v) => s + v, 0) / hourlyAvgs.length).toFixed(1)),
+                min: Number(Math.min(...hourlyAvgs).toFixed(1)),
+                max: Number(Math.max(...hourlyAvgs).toFixed(1)),
+                highHoursCount: hourlyAvgs.filter(v => v > 85).length,
+            };
+        } catch (error) {
+            console.error('[WeatherService] Error al obtener HR de datos_actuales:', error);
+            return null;
+        }
+    }
+
     // Método de depuración para ver qué fechas existen realmente en la BD
     async getDebugDates(): Promise<any> {
         try {
