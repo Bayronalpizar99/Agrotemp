@@ -496,10 +496,11 @@ export class AgroAnalyticsService {
           - Horas aceptables para pulverización (viento <10 km/h, sin lluvia): ${metrics.optimalWindows.acceptableSprayHours} hrs
 
           TAREA:
-          Escribe exactamente 3 párrafos en texto plano (sin markdown, sin negritas, sin listas).
-          1. Condiciones Térmicas del Periodo: Describe la acumulación térmica (GDD) y las horas de estrés como indicadores del ambiente. No hagas ninguna afirmación sobre el estado o etapa del cultivo.
-          2. Condiciones Hídricas y Riesgo Sanitario: Analiza el balance hídrico y el riesgo de enfermedades. ¿Hay déficit o exceso? ¿Es preocupante el riesgo fúngico?
-          3. Recomendaciones Operativas: ¿Qué acciones se sugieren dado el clima? (riego, aplicación de fungicida, aprovechar ventanas de pulverización, monitoreo).
+          Escribe exactamente 4 párrafos en texto plano (sin markdown, sin negritas, sin listas).
+          1. Condiciones Térmicas: Describe la acumulación térmica (GDD) y las horas de estrés por calor y frío como indicadores del ambiente del período. No hagas ninguna afirmación sobre el estado o etapa del cultivo.
+          2. Condiciones Hídricas y VPD: Analiza el balance hídrico (lluvia vs ETo). Interpreta el VPD: ¿indica estrés hídrico en la atmósfera o condiciones óptimas para la transpiración del cultivo? ¿Hay déficit o exceso de agua?
+          3. Riesgo Sanitario: Con base en la humedad relativa, las horas con HR alta y el VPD, evalúa el riesgo de enfermedades fúngicas. ¿Las condiciones favorecieron la proliferación de patógenos? ¿Qué cultivos o tejidos son más vulnerables?
+          4. Recomendaciones Operativas: ¿Qué acciones concretas se sugieren? Considera riego o drenaje según el balance hídrico, aplicación preventiva o curativa de fungicidas según el riesgo sanitario, y aprovechamiento de las ventanas de pulverización disponibles (óptimas y aceptables).
 
           Tono: profesional, directo y accionable para la toma de decisiones en campo.
         `;
