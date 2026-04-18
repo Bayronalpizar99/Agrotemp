@@ -49,11 +49,11 @@ function App() {
           isScrolled={false}
         />
 
-        <Box flex={1} ml="210px" minW={0}>
+        <Box flex={1} ml={{ base: 0, md: '210px' }} minW={0}>
         <Container
           maxW="container.xl"
           px={{ base: 3, md: 4 }}
-          py={6}
+          pt={{ base: '72px', md: 6 }}
           pb={{ base: 20, md: 16 }}
         >
           <Box display={activePage === 'Reporte IA' ? 'block' : 'none'}>
