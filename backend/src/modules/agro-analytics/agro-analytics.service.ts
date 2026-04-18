@@ -59,13 +59,15 @@ export class AgroAnalyticsService {
     }
 
     // 2. Calcular Métricas Agronómicas
+    const vpd = stationHumidity ? this.calculateVPD(rawData, stationHumidity) : undefined;
     const metrics = {
       gdd: this.calculateGDD(rawData, cropBaseTemp),
       stressHours: this.calculateStressHours(rawData, cropBaseTemp, cropMaxTemp),
       waterBalance: this.calculateWaterBalance(rawData, openMeteoEto ?? undefined),
       eto: openMeteoEto ?? this.calculateEto(rawData),
       humidity: stationHumidity,
-      diseaseRisk: this.estimateDiseaseRisk(rawData, stationHumidity ?? undefined),
+      vpd,
+      diseaseRisk: this.estimateDiseaseRisk(rawData, stationHumidity ?? undefined, vpd),
       optimalWindows: this.findOptimalWindows(rawData)
     };
 
@@ -261,14 +263,58 @@ export class AgroAnalyticsService {
   }
 
   /**
+   * Calcula el VPD (Déficit de Presión de Vapor) en kPa usando la ecuación de Magnus.
+   * VPD = es(T) × (1 − HR/100), donde es(T) = 0.6108 × exp(17.27T / (T + 237.3))
+   * - VPD promedio: temperatura media del período + HR promedio
+   * - VPD máximo: temperatura máxima + HR mínima (peor escenario de estrés)
+   */
+  private calculateVPD(
+    data: HourlyWeatherData[],
+    humidity: { avg: number; min: number },
+  ): { avg: number; max: number } {
+    const satVP = (t: number) => 0.6108 * Math.exp((17.27 * t) / (t + 237.3));
+
+    const temps = data
+      .map(d => (d.Temp !== undefined ? d.Temp : (d as any).Temperatura))
+      .filter((t): t is number => typeof t === 'number' && !isNaN(t));
+
+    if (temps.length === 0) return { avg: 0, max: 0 };
+
+    const tMean = temps.reduce((s, t) => s + t, 0) / temps.length;
+    const vpdAvg = satVP(tMean) * (1 - humidity.avg / 100);
+
+    const tMax = Math.max(...temps);
+    const vpdMax = satVP(tMax) * (1 - humidity.min / 100);
+
+    return {
+      avg: Number(vpdAvg.toFixed(2)),
+      max: Number(vpdMax.toFixed(2)),
+    };
+  }
+
+  /**
    * Riesgo de enfermedades fúngicas.
-   * Si hay datos de humedad (Open-Meteo), usa HR como indicador principal.
-   * Si no, fallback a lógica lluvia + temperatura.
+   * Si hay VPD, es el indicador principal (más preciso que HR sola).
+   * Si solo hay HR, usa conteo de horas con HR alta.
+   * Fallback: lógica lluvia + temperatura.
    */
   private estimateDiseaseRisk(
     data: HourlyWeatherData[],
     humidity?: { avg: number; highHoursCount: number },
+    vpd?: { avg: number },
   ): string {
+    if (vpd) {
+      // VPD < 0.5 kPa = atmósfera saturada → condición óptima para hongos
+      if (vpd.avg < 0.5) return 'ALTO';
+      // VPD entre 0.5 y 1.5 kPa = riesgo moderado si la HR es alta
+      if (vpd.avg < 1.5) {
+        if (humidity && (humidity.avg > 80 || humidity.highHoursCount > 24)) return 'MEDIO';
+        return 'BAJO';
+      }
+      // VPD > 1.5 kPa = atmósfera seca, hongos no proliferan
+      return 'BAJO';
+    }
+
     if (humidity) {
       const highHumRatio = humidity.highHoursCount / (data.length || 1);
       if (humidity.avg > 85 || highHumRatio > 0.5) return 'ALTO';
@@ -398,6 +444,7 @@ export class AgroAnalyticsService {
           - Evapotranspiración (${etoSource}): ${metrics.waterBalance.totalOutput} mm
           - Balance Hídrico (Lluvia − ETo): ${metrics.waterBalance.balance} mm
           ${metrics.humidity ? `- Humedad Relativa Promedio${humiditySource}: ${metrics.humidity.avg}%\n          - Humedad Relativa Mínima / Máxima: ${metrics.humidity.min}% / ${metrics.humidity.max}%\n          - Horas con HR > 85% (humedad alta): ${metrics.humidity.highHoursCount} hrs` : ''}
+          ${metrics.vpd ? `- VPD Promedio del período: ${metrics.vpd.avg} kPa  (óptimo: 0.5–1.5 kPa)\n          - VPD Máximo diario: ${metrics.vpd.max} kPa` : ''}
           - Riesgo de Enfermedades Fúngicas: ${metrics.diseaseRisk}
           - Horas favorables para pulverización (viento < 10 km/h, sin lluvia): ${metrics.optimalWindows.optimalSprayHours} hrs
 

@@ -39,6 +39,7 @@ import {
   FiSun,
   FiThermometer,
   FiAlertCircle,
+  FiActivity,
   FiSend,
   FiUser,
   FiMic,
@@ -513,7 +514,7 @@ export const AgroReportPage = () => {
                                 </Text>
                                 <Divider borderColor="whiteAlpha.300" />
                                 
-                                <SimpleGrid columns={{ base: 1, md: 2, lg: msg.reportData.metrics.humidity ? 5 : 4 }} spacing={3}>
+                                <SimpleGrid columns={{ base: 1, md: 2, lg: msg.reportData.metrics.vpd ? 6 : (msg.reportData.metrics.humidity ? 5 : 4) }} spacing={3}>
                                     <MetricCard
                                       label="GDD"
                                       value={msg.reportData.metrics.gdd}
@@ -542,6 +543,21 @@ export const AgroReportPage = () => {
                                         unit="%"
                                         icon={FiDroplet}
                                         color="cyan.300"
+                                      />
+                                    )}
+                                    {msg.reportData.metrics.vpd && (
+                                      <MetricCard
+                                        label="VPD Prom."
+                                        value={msg.reportData.metrics.vpd.avg}
+                                        unit="kPa"
+                                        icon={FiActivity}
+                                        color={
+                                          msg.reportData.metrics.vpd.avg < 0.5
+                                            ? 'cyan.300'
+                                            : msg.reportData.metrics.vpd.avg <= 1.5
+                                            ? 'green.300'
+                                            : 'orange.300'
+                                        }
                                       />
                                     )}
                                     <MetricCard

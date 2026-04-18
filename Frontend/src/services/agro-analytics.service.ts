@@ -51,6 +51,10 @@ export type AgroReportResult = {
       max: number;
       highHoursCount: number;
     } | null;
+    vpd?: {
+      avg: number;
+      max: number;
+    } | null;
   };
   chartData: ChartPoint[];
   aiAnalysis: string;
