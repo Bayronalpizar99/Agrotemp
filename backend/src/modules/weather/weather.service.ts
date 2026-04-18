@@ -373,6 +373,43 @@ export class WeatherService {
         }
     }
 
+    // Obtener radiación solar actual desde Open-Meteo forecast (sensor estación dañado)
+    async getCurrentRadiation(): Promise<number | null> {
+        try {
+            const url = new URL('https://api.open-meteo.com/v1/forecast');
+            url.searchParams.set('latitude', '10.364214');
+            url.searchParams.set('longitude', '-84.507275');
+            url.searchParams.set('hourly', 'shortwave_radiation');
+            url.searchParams.set('timezone', 'America/Costa_Rica');
+            url.searchParams.set('forecast_days', '1');
+
+            const res = await fetch(url.toString(), { signal: AbortSignal.timeout(5000) });
+            if (!res.ok) return null;
+
+            const data = await res.json();
+            const times: string[] = data?.hourly?.time ?? [];
+            const radiation: number[] = data?.hourly?.shortwave_radiation ?? [];
+
+            if (times.length === 0 || radiation.length === 0) return null;
+
+            // Hora actual en Costa Rica (UTC-6)
+            const CR_OFFSET_MS = 6 * 60 * 60 * 1000;
+            const nowCR = new Date(Date.now() - CR_OFFSET_MS);
+            const currentHourStr =
+                `${nowCR.getUTCFullYear()}-` +
+                `${String(nowCR.getUTCMonth() + 1).padStart(2, '0')}-` +
+                `${String(nowCR.getUTCDate()).padStart(2, '0')}T` +
+                `${String(nowCR.getUTCHours()).padStart(2, '0')}:00`;
+
+            const idx = times.indexOf(currentHourStr);
+            if (idx === -1) return null;
+
+            return typeof radiation[idx] === 'number' ? radiation[idx] : null;
+        } catch {
+            return null;
+        }
+    }
+
     // Método de depuración para ver qué fechas existen realmente en la BD
     async getDebugDates(): Promise<any> {
         try {

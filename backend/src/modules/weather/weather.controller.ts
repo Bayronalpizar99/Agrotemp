@@ -45,4 +45,10 @@ export class WeatherController {
     async getDailyStats(): Promise<any> {
         return this.weatherService.getDailyStats();
     }
+
+    @Get('radiation')
+    @ApiOperation({ summary: 'Get current solar radiation from Open-Meteo forecast (station sensor broken)' })
+    async getCurrentRadiation(): Promise<number | null> {
+        return this.weatherService.getCurrentRadiation();
+    }
 }

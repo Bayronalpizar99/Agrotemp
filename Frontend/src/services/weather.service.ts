@@ -8,12 +8,15 @@ export type WeatherData = {
     SUM_lluv: number;
     Vmax: number;
     timestamp_extraccion: string;
+    HR?: number;
+    Velocidad?: number;
 };
 
 export type HourlyWeatherData = {
     Fecha: string;
     Lluvia: number;
     Temp: number;
+    Rad_max?: number;
 };
 
 const weatherService = {
@@ -53,6 +56,17 @@ const weatherService = {
         } catch (error) {
             console.error('Error:', error);
             throw error;
+        }
+    },
+
+    getCurrentRadiation: async (): Promise<number | null> => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/weather/radiation`);
+            if (!response.ok) return null;
+            const value = await response.json();
+            return typeof value === 'number' ? value : null;
+        } catch {
+            return null;
         }
     },
 

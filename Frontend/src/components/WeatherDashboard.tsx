@@ -16,6 +16,7 @@ import {
   FiCloudDrizzle,
   FiCloudOff,
   FiWind,
+  FiDroplet,
 } from 'react-icons/fi';
 
 import { weatherService } from '../services/weather.service';
@@ -39,6 +40,14 @@ const getWeatherIcon = (title: string, value: number) => {
         case 'Velocidad Viento':
             iconComponent = FiWind;
             color = value > 20 ? 'cyan.400' : 'gray.400';
+            break;
+        case 'Humedad Relativa':
+            iconComponent = FiDroplet;
+            color = value > 85 ? 'blue.400' : value > 60 ? 'cyan.400' : 'green.400';
+            break;
+        case 'Radiación Solar':
+            iconComponent = FiSun;
+            color = value > 700 ? 'yellow.300' : value > 300 ? 'yellow.500' : 'gray.400';
             break;
         default: return null;
     }
@@ -122,6 +131,7 @@ const DataCard = ({ title, value, unit, icon, delay = 0 }: { title: string; valu
 export const WeatherDashboard = () => {
   const [currentWeather, setCurrentWeather] = useState<WeatherData | null>(null);
   const [hourlyData, setHourlyData] = useState<any[]>([]);
+  const [radiation, setRadiation] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const toast = useToast();
 
@@ -129,12 +139,14 @@ export const WeatherDashboard = () => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [currentData, hourlyDataResponse] = await Promise.all([
+        const [currentData, hourlyDataResponse, radiationData] = await Promise.all([
           weatherService.getCurrentWeather(),
-          weatherService.getHourlyWeather(1) // Solo el último registro
+          weatherService.getHourlyWeather(1),
+          weatherService.getCurrentRadiation(),
         ]);
         setCurrentWeather(currentData);
         setHourlyData(hourlyDataResponse);
+        setRadiation(radiationData);
       } catch (error) {
         toast({
           title: 'Error',
@@ -210,11 +222,11 @@ export const WeatherDashboard = () => {
         </Heading>
       </Box>
 
-      <SimpleGrid 
-        columns={{ base: 1, md: 2 }} 
-        spacing={8} 
-        maxW="container.md" 
-        mx="auto" 
+      <SimpleGrid
+        columns={{ base: 1, sm: 2, lg: 3 }}
+        spacing={8}
+        maxW="container.lg"
+        mx="auto"
         w="full"
       >
         {hourlyData.length > 0 && (
@@ -233,6 +245,15 @@ export const WeatherDashboard = () => {
               icon={getWeatherIcon("Lluvia Hoy", hourlyData[0].Lluvia)}
               delay={100}
             />
+            {radiation !== null && (
+              <DataCard
+                title="Radiación Solar"
+                value={radiation}
+                unit="W/m²"
+                icon={getWeatherIcon("Radiación Solar", radiation)}
+                delay={200}
+              />
+            )}
           </>
         )}
         <DataCard
@@ -240,15 +261,24 @@ export const WeatherDashboard = () => {
           value={currentWeather.Tmax}
           unit="°C"
           icon={getWeatherIcon("Temp. Máxima", currentWeather.Tmax)}
-          delay={200}
+          delay={300}
         />
         <DataCard
           title="Temperatura Mínima"
           value={currentWeather.Tmin}
           unit="°C"
           icon={getWeatherIcon("Temp. Mínima", currentWeather.Tmin)}
-          delay={300}
+          delay={400}
         />
+        {currentWeather.HR !== undefined && (
+          <DataCard
+            title="Humedad Relativa"
+            value={currentWeather.HR}
+            unit="%"
+            icon={getWeatherIcon("Humedad Relativa", currentWeather.HR)}
+            delay={500}
+          />
+        )}
       </SimpleGrid>
     </VStack>
   );
