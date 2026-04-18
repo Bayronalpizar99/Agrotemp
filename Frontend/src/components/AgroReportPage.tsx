@@ -570,13 +570,22 @@ export const AgroReportPage = () => {
 
                                 <SimpleGrid columns={{ base: 1, md: 2 }} spacing={3}>
                                    <CardWrapper>
-                                      <Text fontSize="xs" fontWeight="bold" color="gray.400" mb={2} textTransform="uppercase">Ventanas Manejo</Text>
-                                      <HStack justify="space-between">
-                                          <Text fontSize="sm">Óptimas Pulv. (&lt;10km/h):</Text>
+                                      <Text fontSize="xs" fontWeight="bold" color="gray.400" mb={2} textTransform="uppercase">Ventanas Pulverización</Text>
+                                      <HStack justify="space-between" mb={1}>
+                                          <Text fontSize="sm">Óptimas (viento + HR + sin lluvia):</Text>
                                           <Text fontWeight="bold" color="green.300">
                                               {msg.reportData.metrics.optimalWindows?.optimalSprayHours || 0} hrs
                                           </Text>
                                       </HStack>
+                                      <HStack justify="space-between">
+                                          <Text fontSize="sm">Aceptables (viento + sin lluvia):</Text>
+                                          <Text fontWeight="bold" color="yellow.300">
+                                              {msg.reportData.metrics.optimalWindows?.acceptableSprayHours || 0} hrs
+                                          </Text>
+                                      </HStack>
+                                      {msg.reportData.metrics.optimalWindows?.conditionsUsed === 'fallback' && (
+                                          <Text fontSize="xs" color="gray.500" mt={1}>* Datos de viento estimados</Text>
+                                      )}
                                    </CardWrapper>
                                    
                                    <CardWrapper>

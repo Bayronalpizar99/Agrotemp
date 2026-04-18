@@ -287,6 +287,77 @@ export class WeatherService {
         }
     }
 
+    // Obtener datos de viento (Velocidad) y HR desde datos_actuales agrupados por hora
+    async getActualesWindDataByDateRange(
+        startDate: string,
+        endDate: string,
+    ): Promise<Record<string, { velocidad: number; hr: number }> | null> {
+        try {
+            const startLimit = new Date(startDate);
+            startLimit.setHours(0, 0, 0, 0);
+
+            const endLimit = new Date(endDate);
+            endLimit.setDate(endLimit.getDate() + 1);
+            endLimit.setMilliseconds(-1);
+
+            const snapshot = await this.firestore
+                .collection('datos_actuales')
+                .where('timestamp_extraccion', '>=', startLimit)
+                .where('timestamp_extraccion', '<=', endLimit)
+                .get();
+
+            if (snapshot.empty) return null;
+
+            // Agrupar Velocidad y HR por hora (YYYY-MM-DD HH)
+            const buckets = new Map<string, { velocidades: number[]; hrs: number[] }>();
+
+            snapshot.docs.forEach(doc => {
+                const data = doc.data();
+                // Velocidad: campo nuevo de la 3ª tabla (ya en km/h)
+                // Vmax: campo original de la 1ª tabla (almacenado en centésimas → ÷100)
+                const velocidad: number | null =
+                    typeof data.Velocidad === 'number' && !isNaN(data.Velocidad)
+                        ? data.Velocidad
+                        : typeof data.Vmax === 'number' && !isNaN(data.Vmax)
+                        ? data.Vmax / 100
+                        : null;
+                const hr = data.HR;
+
+                // Requiere al menos un campo de velocidad para ser útil
+                if (velocidad === null) return;
+
+                const t: Date = typeof data.timestamp_extraccion?.toDate === 'function'
+                    ? data.timestamp_extraccion.toDate()
+                    : new Date(data.timestamp_extraccion);
+
+                const hourKey = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')} ${String(t.getHours()).padStart(2, '0')}`;
+
+                if (!buckets.has(hourKey)) buckets.set(hourKey, { velocidades: [], hrs: [] });
+                buckets.get(hourKey)!.velocidades.push(velocidad);
+                if (typeof hr === 'number' && !isNaN(hr)) buckets.get(hourKey)!.hrs.push(hr);
+            });
+
+            if (buckets.size === 0) return null;
+
+            const result: Record<string, { velocidad: number; hr: number }> = {};
+            buckets.forEach((val, key) => {
+                const avgVelocidad = val.velocidades.reduce((s, v) => s + v, 0) / val.velocidades.length;
+                const avgHr = val.hrs.length > 0
+                    ? val.hrs.reduce((s, v) => s + v, 0) / val.hrs.length
+                    : 100; // Si no hay HR, asumir húmedo (conservador)
+                result[key] = {
+                    velocidad: Number(avgVelocidad.toFixed(1)),
+                    hr: Number(avgHr.toFixed(1)),
+                };
+            });
+
+            return result;
+        } catch (error) {
+            console.error('[WeatherService] Error al obtener datos de viento de datos_actuales:', error);
+            return null;
+        }
+    }
+
     // Método de depuración para ver qué fechas existen realmente en la BD
     async getDebugDates(): Promise<any> {
         try {

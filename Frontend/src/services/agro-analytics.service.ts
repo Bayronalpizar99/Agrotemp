@@ -41,6 +41,8 @@ export type AgroReportResult = {
     stressHours: StressHours;
     optimalWindows?: {
       optimalSprayHours: number;
+      acceptableSprayHours: number;
+      conditionsUsed: 'station' | 'fallback';
     };
     waterBalance: WaterBalance;
     diseaseRisk: string;

@@ -36,11 +36,12 @@ export class AgroAnalyticsService {
   async generateReport(params: AgroReportParams) {
     const { startDate, endDate, cropBaseTemp, cropMaxTemp } = params;
 
-    // 1. Obtener datos históricos, ETo de Open-Meteo y HR de la estación en paralelo
-    const [rawData, openMeteoEto, stationHumidity] = await Promise.all([
+    // 1. Obtener datos históricos, ETo de Open-Meteo, HR y viento de la estación en paralelo
+    const [rawData, openMeteoEto, stationHumidity, windData] = await Promise.all([
       this.weatherService.getHourlyWeatherByDateRange(startDate, endDate),
       this.fetchOpenMeteoEto(startDate, endDate),
       this.weatherService.getActualesHumidityByDateRange(startDate, endDate),
+      this.weatherService.getActualesWindDataByDateRange(startDate, endDate),
     ]);
 
     if (!rawData || rawData.length === 0) {
@@ -68,7 +69,7 @@ export class AgroAnalyticsService {
       humidity: stationHumidity,
       vpd,
       diseaseRisk: this.estimateDiseaseRisk(rawData, stationHumidity ?? undefined, vpd),
-      optimalWindows: this.findOptimalWindows(rawData)
+      optimalWindows: this.findOptimalWindows(rawData, windData)
     };
 
     // 3. Generar Datos para Gráficos
@@ -356,22 +357,67 @@ export class AgroAnalyticsService {
     return 'BAJO';
   }
 
-  private findOptimalWindows(data: HourlyWeatherData[]) {
-    // Ejemplo: Ventana de pulverización (Viento < 10 km/h, Sin lluvia)
+  /**
+   * Calcula ventanas óptimas y aceptables para aplicación de agroquímicos.
+   *
+   * Si hay datos de viento reales (windData de datos_actuales):
+   *   - Óptima: Velocidad < 10 km/h + HR < 85% + sin lluvia (triple condición)
+   *   - Aceptable: Velocidad < 10 km/h + sin lluvia
+   *
+   * Fallback (sin datos de viento): Vmax de datos_horarios + sin lluvia (comportamiento anterior).
+   */
+  private findOptimalWindows(
+    data: HourlyWeatherData[],
+    windData?: Record<string, { velocidad: number; hr: number }> | null,
+  ): { optimalSprayHours: number; acceptableSprayHours: number; conditionsUsed: 'station' | 'fallback' } {
+    const hasStationWind = windData !== null && windData !== undefined && Object.keys(windData).length > 0;
     let optimalSprayHours = 0;
-    data.forEach(d => {
-        // Asumiendo que tenemos velocidad del viento (Vmax o similar) en HourlyWeatherData
-        // Si no está en la interfaz, usar 0 o checkear propiedad
-        const windSpeed = (d as any).Vmax || 0; 
-        
-        const p = d.Precip !== undefined ? d.Precip : (d as any).Lluvia;
-        const precip = typeof p === 'number' ? p : parseFloat(p) || 0;
+    let acceptableSprayHours = 0;
 
-        if (windSpeed < 10 && precip === 0) {
+    data.forEach(d => {
+      const p = d.Precip !== undefined ? d.Precip : (d as any).Lluvia;
+      const precip = typeof p === 'number' ? p : parseFloat(p) || 0;
+      const noRain = precip === 0;
+
+      if (hasStationWind) {
+        // Extraer clave de hora desde d.fecha para cruzar con windData
+        let hourKey: string | null = null;
+        try {
+          const t = d.fecha instanceof Date ? d.fecha : new Date(d.fecha);
+          hourKey = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')} ${String(t.getHours()).padStart(2, '0')}`;
+        } catch { /* ignorar registros sin fecha válida */ }
+
+        const stationHour = hourKey ? windData![hourKey] : null;
+
+        if (stationHour) {
+          // Hora con datos reales de estación → triple condición
+          if (stationHour.velocidad < 10 && noRain) {
+            acceptableSprayHours++;
+            if (stationHour.hr < 85) optimalSprayHours++;
+          }
+        } else {
+          // Hora sin cobertura de estación (hueco del sensor) → fallback por hora
+          const windSpeed = (d as any).Vmax ?? 0;
+          if (windSpeed < 10 && noRain) {
             optimalSprayHours++;
+            acceptableSprayHours++;
+          }
         }
+      } else {
+        // Fallback: solo Vmax + sin lluvia
+        const windSpeed = (d as any).Vmax || 0;
+        if (windSpeed < 10 && noRain) {
+          optimalSprayHours++;
+          acceptableSprayHours++;
+        }
+      }
     });
-    return { optimalSprayHours };
+
+    return {
+      optimalSprayHours,
+      acceptableSprayHours,
+      conditionsUsed: hasStationWind ? 'station' : 'fallback',
+    };
   }
 
   // --- Helper: Agrupar por fecha (YYYY-MM-DD) ---
@@ -446,7 +492,8 @@ export class AgroAnalyticsService {
           ${metrics.humidity ? `- Humedad Relativa Promedio${humiditySource}: ${metrics.humidity.avg}%\n          - Humedad Relativa Mínima / Máxima: ${metrics.humidity.min}% / ${metrics.humidity.max}%\n          - Horas con HR > 85% (humedad alta): ${metrics.humidity.highHoursCount} hrs` : ''}
           ${metrics.vpd ? `- VPD Promedio del período: ${metrics.vpd.avg} kPa  (óptimo: 0.5–1.5 kPa)\n          - VPD Máximo diario: ${metrics.vpd.max} kPa` : ''}
           - Riesgo de Enfermedades Fúngicas: ${metrics.diseaseRisk}
-          - Horas favorables para pulverización (viento < 10 km/h, sin lluvia): ${metrics.optimalWindows.optimalSprayHours} hrs
+          - Horas óptimas para pulverización (viento <10 km/h, HR <85%, sin lluvia): ${metrics.optimalWindows.optimalSprayHours} hrs
+          - Horas aceptables para pulverización (viento <10 km/h, sin lluvia): ${metrics.optimalWindows.acceptableSprayHours} hrs
 
           TAREA:
           Escribe exactamente 3 párrafos en texto plano (sin markdown, sin negritas, sin listas).
