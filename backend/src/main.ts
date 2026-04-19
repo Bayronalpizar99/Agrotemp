@@ -60,7 +60,7 @@ async function bootstrap() {
       return callback(new Error(`Origen no permitido por CORS: ${origin}`), false);
     },
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    allowedHeaders: ['Content-Type', 'Accept', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Accept', 'Authorization', 'x-agro-api-key', 'X-Agro-Api-Key'],
     exposedHeaders: ['Content-Disposition'],
     credentials: true,
   });
