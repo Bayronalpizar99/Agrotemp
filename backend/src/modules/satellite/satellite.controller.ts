@@ -1,11 +1,25 @@
-import { Controller, Get, Post, Query, Body, Res, HttpException, HttpStatus } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpException,
+  HttpStatus,
+  Logger,
+  Post,
+  Query,
+  Res,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery, ApiBody } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { SatelliteService } from './satellite.service';
+import { SatelliteQueryDto } from './dto/satellite-query.dto';
+import { SatelliteGeometryDto } from './dto/satellite-geometry.dto';
 
 @ApiTags('Satellite')
 @Controller('satellite')
 export class SatelliteController {
+  private readonly logger = new Logger(SatelliteController.name);
+
   constructor(private readonly satelliteService: SatelliteService) {}
 
   @Post('ndvi')
@@ -15,14 +29,10 @@ export class SatelliteController {
   @ApiQuery({ name: 'to', required: true, example: '2026-01-31' })
   @ApiBody({ required: false, description: 'Polígono GeoJSON opcional para estadísticas precisas', schema: { type: 'object', properties: { geometry: { type: 'array', items: { type: 'array', items: { type: 'number' } }, description: '[[lng,lat], ...] — mínimo 3 puntos' } } } })
   async getNDVI(
-    @Query('bbox') bboxStr: string,
-    @Query('from') from: string,
-    @Query('to') to: string,
-    @Body() body?: { geometry?: [number, number][] },
+    @Query() queryDto: SatelliteQueryDto,
+    @Body() bodyDto?: SatelliteGeometryDto,
   ) {
-    if (!bboxStr || !from || !to) {
-      throw new HttpException('bbox, from y to son requeridos', HttpStatus.BAD_REQUEST);
-    }
+    const { bbox: bboxStr, from, to } = queryDto;
 
     const bbox = bboxStr.split(',').map(Number);
     if (bbox.length !== 4 || bbox.some(isNaN)) {
@@ -30,22 +40,25 @@ export class SatelliteController {
     }
 
     let geometry: [number, number][] | undefined;
-    if (body?.geometry) {
-      if (!Array.isArray(body.geometry) || body.geometry.length < 3) {
+    if (bodyDto?.geometry) {
+      if (!Array.isArray(bodyDto.geometry) || bodyDto.geometry.length < 3) {
         throw new HttpException('geometry debe ser un array de al menos 3 pares [lng,lat]', HttpStatus.BAD_REQUEST);
       }
-      if (body.geometry.some(p => !Array.isArray(p) || p.length !== 2 || p.some(isNaN))) {
+      if (bodyDto.geometry.some((p) => !Array.isArray(p) || p.length !== 2 || p.some((n) => Number.isNaN(Number(n))))) {
         throw new HttpException('Cada punto de geometry debe ser un par numérico [lng, lat]', HttpStatus.BAD_REQUEST);
       }
-      geometry = body.geometry;
+      geometry = bodyDto.geometry as [number, number][];
     }
 
     try {
       const data = await this.satelliteService.getNDVI(bbox, from, to, geometry);
       return { success: true, data };
     } catch (error) {
+      this.logger.error(
+        `Error al consultar NDVI: ${error instanceof Error ? error.message : String(error)}`,
+      );
       throw new HttpException(
-        { success: false, message: error instanceof Error ? error.message : 'Error al obtener datos NDVI' },
+        { success: false, message: 'No fue posible obtener datos NDVI en este momento.' },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
@@ -57,14 +70,10 @@ export class SatelliteController {
   @ApiQuery({ name: 'from', required: true })
   @ApiQuery({ name: 'to', required: true })
   async getTrueColorImage(
-    @Query('bbox') bboxStr: string,
-    @Query('from') from: string,
-    @Query('to') to: string,
+    @Query() queryDto: SatelliteQueryDto,
     @Res() res: Response,
   ) {
-    if (!bboxStr || !from || !to) {
-      throw new HttpException('bbox, from y to son requeridos', HttpStatus.BAD_REQUEST);
-    }
+    const { bbox: bboxStr, from, to } = queryDto;
     const bbox = bboxStr.split(',').map(Number);
     if (bbox.length !== 4 || bbox.some(isNaN)) {
       throw new HttpException('bbox debe tener 4 valores numéricos', HttpStatus.BAD_REQUEST);
@@ -75,8 +84,11 @@ export class SatelliteController {
       res.setHeader('Cache-Control', 'public, max-age=3600');
       res.send(imageBuffer);
     } catch (error) {
+      this.logger.error(
+        `Error al obtener imagen true-color: ${error instanceof Error ? error.message : String(error)}`,
+      );
       throw new HttpException(
-        { success: false, message: error.message || 'Error al generar imagen' },
+        { success: false, message: 'No fue posible generar la imagen satelital.' },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
@@ -88,14 +100,10 @@ export class SatelliteController {
   @ApiQuery({ name: 'from', required: true, example: '2026-02-01' })
   @ApiQuery({ name: 'to', required: true, example: '2026-03-28' })
   async getNDVIImage(
-    @Query('bbox') bboxStr: string,
-    @Query('from') from: string,
-    @Query('to') to: string,
+    @Query() queryDto: SatelliteQueryDto,
     @Res() res: Response,
   ) {
-    if (!bboxStr || !from || !to) {
-      throw new HttpException('bbox, from y to son requeridos', HttpStatus.BAD_REQUEST);
-    }
+    const { bbox: bboxStr, from, to } = queryDto;
     const bbox = bboxStr.split(',').map(Number);
     if (bbox.length !== 4 || bbox.some(isNaN)) {
       throw new HttpException('bbox debe tener 4 valores numéricos', HttpStatus.BAD_REQUEST);
@@ -107,8 +115,11 @@ export class SatelliteController {
       res.setHeader('Cache-Control', 'public, max-age=3600');
       res.send(imageBuffer);
     } catch (error) {
+      this.logger.error(
+        `Error al obtener imagen NDVI: ${error instanceof Error ? error.message : String(error)}`,
+      );
       throw new HttpException(
-        { success: false, message: error.message || 'Error al generar imagen NDVI' },
+        { success: false, message: 'No fue posible generar la imagen NDVI.' },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }

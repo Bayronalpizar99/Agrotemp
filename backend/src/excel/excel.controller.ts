@@ -1,33 +1,26 @@
-import { Controller, Get, Query, Res } from '@nestjs/common';
+import { Controller, Get, Logger, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { Workbook } from 'exceljs';
 import { getFirestore } from 'firebase-admin/firestore';
-
-interface DatosHorarios {
-    Fecha: string; // Usaremos el string directo, no objeto Date
-    Temp: number;
-    Lluvia: number;
-}
+import { DownloadExcelQueryDto } from './dto/download-excel-query.dto';
 
 @Controller('excel')
 export class ExcelController {
-    constructor() {
-        console.log('ExcelController initialized');
-    }
+    private readonly logger = new Logger(ExcelController.name);
 
     @Get('download')
     async downloadExcel(
-        @Query('startDate') startDate: string,
-        @Query('endDate') endDate: string,
+        @Query() queryDto: DownloadExcelQueryDto,
         @Res() res: Response
     ) {
         try {
-            if (!startDate || !endDate) {
-                return res.status(400).json({ message: 'Las fechas son requeridas' });
-            }
+            const { startDate, endDate } = queryDto;
 
             const start = new Date(startDate);
             const end = new Date(endDate);
+            if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+                return res.status(400).json({ message: 'Formato de fecha inválido. Usa YYYY-MM-DD.' });
+            }
             const db = getFirestore();
 
            // Consulta inicial: traer últimos registros (límite de seguridad para no explotar memoria)
@@ -76,7 +69,6 @@ export class ExcelController {
              };
 
             const startTime = start.getTime();
-            const endTime = end.getTime(); // Frontend ya manda final del día si corresponde, o ajustamos aquí
 
             // Ajuste de endTime para incluir todo el día si viene como "00:00"
             const adjustedEndTime = new Date(end).setHours(23, 59, 59, 999);
@@ -100,13 +92,13 @@ export class ExcelController {
             }
 
             // Generar Excel
-            console.log('📈 Generando archivo Excel con', datos.length, 'registros...');
+            this.logger.log(`Generando archivo Excel con ${datos.length} registros...`);
 
             // Crear un nuevo libro de Excel
             const workbook = new Workbook();
             const worksheet = workbook.addWorksheet('Datos Horarios');
             
-            console.log('📑 Configurando hoja de cálculo...');
+            this.logger.log('Configurando hoja de cálculo...');
 
             // Definir las columnas
             worksheet.columns = [
@@ -143,21 +135,19 @@ export class ExcelController {
                 `attachment; filename=datos_horarios.xlsx`
             );
 
-            console.log('💾 Guardando archivo Excel...');
+            this.logger.log('Guardando archivo Excel...');
             
             // Enviar el archivo
             await workbook.xlsx.write(res);
             res.end();
             
-            console.log('✅ Archivo Excel generado y enviado correctamente');
+            this.logger.log('Archivo Excel generado y enviado correctamente');
         } catch (error) {
-            console.error('Error al generar el archivo Excel:', error);
-            // Verificar si la respuesta ya fue enviada
+            this.logger.error(
+                `Error al generar Excel: ${error instanceof Error ? error.message : String(error)}`
+            );
             if (!res.headersSent) {
-                res.status(500).json({ 
-                    message: 'Error al generar el archivo Excel',
-                    error: error.message 
-                });
+                res.status(500).json({ message: 'Error interno al generar el archivo Excel' });
             }
         }
     }

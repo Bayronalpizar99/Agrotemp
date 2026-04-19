@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { CacheModule } from '@nestjs/cache-manager';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 import appConfig from './config/app.config';
 import { WeatherModule } from './modules/weather/weather.module';
 import { FirebaseModule } from './modules/firebase/firebase.module';
@@ -22,6 +24,11 @@ import { SatelliteModule } from './modules/satellite/satellite.module';
       isGlobal: true,
       ttl: 60, // Default TTL in seconds
     }),
+    // Rate Limiting (DDoS Protection)
+    ThrottlerModule.forRoot([{
+      ttl: 60000, 
+      limit: 20, // 20 requests per minute
+    }]),
     // Feature Modules
     FirebaseModule,
     WeatherModule,
@@ -31,5 +38,11 @@ import { SatelliteModule } from './modules/satellite/satellite.module';
     SatelliteModule,
   ],
   controllers: [AppController],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
 export class AppModule {}

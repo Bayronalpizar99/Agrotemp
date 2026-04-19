@@ -39,3 +39,6 @@ lerna-debug.log*
 
 # Firebase
 src/config/credentials/firebase-service-account.json
+
+# Local utility scripts
+test-gemini.js

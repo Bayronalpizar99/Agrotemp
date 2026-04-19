@@ -1,9 +1,10 @@
-import { Controller, Get, Query, ParseIntPipe, UseInterceptors } from '@nestjs/common';
+import { Controller, Get, Query, UseInterceptors } from '@nestjs/common';
 import { CacheInterceptor } from '@nestjs/cache-manager';
 import { WeatherService } from './weather.service';
-import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { CurrentWeatherData } from './interfaces/current-weather.interface';
 import { HourlyWeatherData } from './interfaces/hourly-weather.interface';
+import { DateRangeQueryDto } from './dto/date-range-query.dto';
 
 @ApiTags('Weather')
 @Controller('weather')
@@ -17,12 +18,6 @@ export class WeatherController {
         return this.weatherService.getCurrentWeather();
     }
 
-    @Get('debug/dates')
-    @ApiOperation({ summary: 'Depurar fechas existentes en Firestore' })
-    async getDebugDates() {
-        return this.weatherService.getDebugDates();
-    }
-
     @Get('hourly')
     @ApiOperation({ summary: 'Get latest hourly weather data' })
     async getHourlyWeather(): Promise<HourlyWeatherData[]> {
@@ -31,12 +26,10 @@ export class WeatherController {
 
     @Get('range')
     @ApiOperation({ summary: 'Get hourly weather data by date range' })
-    @ApiQuery({ name: 'startDate', required: true })
-    @ApiQuery({ name: 'endDate', required: true })
     async getHourlyWeatherByDateRange(
-        @Query('startDate') startDate: string,
-        @Query('endDate') endDate: string
+        @Query() queryDto: DateRangeQueryDto,
     ): Promise<HourlyWeatherData[]> {
+        const { startDate, endDate } = queryDto;
         return this.weatherService.getHourlyWeatherByDateRange(startDate, endDate);
     }
 

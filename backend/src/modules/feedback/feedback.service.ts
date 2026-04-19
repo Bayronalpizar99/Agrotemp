@@ -1,11 +1,6 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { Firestore } from 'firebase-admin/firestore';
-
-export interface FeedbackPayload {
-  rating: number;
-  category: string;
-  comment: string;
-}
+import { CreateFeedbackDto } from './dto/create-feedback.dto';
 
 @Injectable()
 export class FeedbackService {
@@ -13,7 +8,7 @@ export class FeedbackService {
     @Inject('FIRESTORE') private readonly firestore: Firestore,
   ) {}
 
-  async saveFeedback(payload: FeedbackPayload): Promise<{ id: string }> {
+  async saveFeedback(payload: CreateFeedbackDto): Promise<{ id: string }> {
     const doc = await this.firestore.collection('feedback').add({
       ...payload,
       createdAt: new Date().toISOString(),

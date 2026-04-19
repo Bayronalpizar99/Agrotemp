@@ -26,6 +26,7 @@ function evaluatePixel(sample) {
 const TOKEN_URL = 'https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token';
 const STATS_URL = 'https://sh.dataspace.copernicus.eu/api/v1/statistics';
 const PROCESS_URL = 'https://sh.dataspace.copernicus.eu/api/v1/process';
+const SATELLITE_TIMEOUT_MS = 10000;
 
 const TRUE_COLOR_EVALSCRIPT = `
 //VERSION=3
@@ -93,11 +94,13 @@ export class SatelliteService {
         client_id: clientId,
         client_secret: clientSecret,
       }),
+      signal: AbortSignal.timeout(SATELLITE_TIMEOUT_MS),
     });
 
     if (!res.ok) {
       const text = await res.text();
-      throw new Error(`Sentinel Hub auth failed (${res.status}): ${text}`);
+      this.logger.error(`Sentinel Hub auth failed (${res.status}): ${text}`);
+      throw new Error(`Sentinel Hub auth failed (${res.status})`);
     }
 
     const data = await res.json();
@@ -166,12 +169,13 @@ export class SatelliteService {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(SATELLITE_TIMEOUT_MS),
     });
 
     if (!res.ok) {
       const text = await res.text();
       this.logger.error(`Sentinel Hub Statistical API error (${res.status}): ${text}`);
-      throw new Error(`Error al obtener datos NDVI (${res.status}): ${text}`);
+      throw new Error(`Error al obtener datos NDVI (${res.status})`);
     }
 
     const result = await res.json();
@@ -273,12 +277,13 @@ export class SatelliteService {
         Accept: 'image/png',
       },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(SATELLITE_TIMEOUT_MS),
     });
 
     if (!res.ok) {
       const text = await res.text();
       this.logger.error(`Process API error (${res.status}): ${text}`);
-      throw new Error(`Error al obtener imagen satelital (${res.status}): ${text}`);
+      throw new Error(`Error al obtener imagen satelital (${res.status})`);
     }
 
     const arrayBuffer = await res.arrayBuffer();

@@ -410,30 +410,4 @@ export class WeatherService {
         }
     }
 
-    // Método de depuración para ver qué fechas existen realmente en la BD
-    async getDebugDates(): Promise<any> {
-        try {
-            console.log('[DEBUG] Obteniendo muestra de fechas...');
-            // Obtenemos CUALQUIER documento para ver la estructura
-            const snapshot = await this.firestore
-                .collection('datos_horarios')
-                .limit(5)
-                .get();
-
-            const dates = snapshot.docs.map(doc => {
-                const data = doc.data();
-                return {
-                    id: doc.id,
-                    data_raw: data // Devolvemos todo el objeto para ver campos
-                };
-            });
-            
-            return {
-                count: snapshot.size,
-                sample_docs: dates
-            };
-        } catch (error) {
-             throw new Error(`Error debug fechas: ${error.message}`);
-        }
-    }
 }

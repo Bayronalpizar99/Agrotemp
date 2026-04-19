@@ -1,5 +1,11 @@
 // src/services/agro-analytics.service.ts
 const API_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/agro-analytics`;
+const AGRO_API_KEY = import.meta.env.VITE_AGRO_API_KEY;
+
+const getGeminiHeaders = (): HeadersInit =>
+  AGRO_API_KEY && AGRO_API_KEY.trim().length > 0
+    ? { 'x-agro-api-key': AGRO_API_KEY.trim() }
+    : {};
 
 export interface AgroReportParams {
   startDate: string;
@@ -73,7 +79,11 @@ export const agroAnalyticsService = {
     });
     if (params.cropName) queryParams.set('cropName', params.cropName);
 
-    const response = await fetch(`${API_URL}/report?${queryParams.toString()}`);
+    const response = await fetch(`${API_URL}/report?${queryParams.toString()}`, {
+      headers: {
+        ...getGeminiHeaders(),
+      },
+    });
 
     if (!response.ok) {
         let errorMessage = 'Error al obtener el reporte';
@@ -92,7 +102,8 @@ export const agroAnalyticsService = {
     const response = await fetch(`${API_URL}/chat`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        ...getGeminiHeaders(),
       },
       body: JSON.stringify({ question, reportContext, chatHistory })
     });

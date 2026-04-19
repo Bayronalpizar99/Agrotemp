@@ -1,36 +1,47 @@
-import { Controller, Get, Query, HttpException, HttpStatus, Post, Body, BadRequestException } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpException,
+  HttpStatus,
+  Logger,
+  Post,
+  Query,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
 import { AgroAnalyticsService, AgroReportParams } from './agro-analytics.service';
-import { ApiTags, ApiOperation, ApiQuery, ApiBody } from '@nestjs/swagger';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { AgroReportDto } from './dto/agro-report.dto';
+import { ChatReportDto } from './dto/chat-report.dto';
+import { Throttle } from '@nestjs/throttler';
+import { AgroApiKeyGuard } from './security/agro-api-key.guard';
+import { GeminiUsageGuard } from './security/gemini-usage.guard';
+import { GeminiConcurrencyInterceptor } from './security/gemini-concurrency.interceptor';
+import { GeminiEndpoint } from './security/gemini-endpoint.decorator';
 
 @ApiTags('Agro-Analytics')
 @Controller('agro-analytics')
+@UseGuards(AgroApiKeyGuard, GeminiUsageGuard)
+@UseInterceptors(GeminiConcurrencyInterceptor)
 export class AgroAnalyticsController {
+  private readonly logger = new Logger(AgroAnalyticsController.name);
+
   constructor(private readonly analyticsService: AgroAnalyticsService) {}
 
   @Get('report')
+  @Throttle({ default: { limit: 2, ttl: 60000 } })
+  @GeminiEndpoint('report')
   @ApiOperation({ summary: 'Generar reporte de agricultura de precisión con IA' })
-  @ApiQuery({ name: 'startDate', required: true, example: '2025-01-01' })
-  @ApiQuery({ name: 'endDate', required: true, example: '2025-01-31' })
-  @ApiQuery({ name: 'cropBaseTemp', required: false, example: 10, description: 'Temperatura base del cultivo (default: 10)' })
-  @ApiQuery({ name: 'cropMaxTemp', required: false, example: 30, description: 'Temperatura máxima óptima (default: 30)' })
-  @ApiQuery({ name: 'cropName', required: false, example: 'Maíz', description: 'Nombre del cultivo de referencia' })
   async getReport(
-    @Query('startDate') startDate: string,
-    @Query('endDate') endDate: string,
-    @Query('cropBaseTemp') cropBaseTemp?: number,
-    @Query('cropMaxTemp') cropMaxTemp?: number,
-    @Query('cropName') cropName?: string
+    @Query() queryDto: AgroReportDto
   ) {
-    if (!startDate || !endDate) {
-      throw new HttpException('startDate y endDate son requeridos', HttpStatus.BAD_REQUEST);
-    }
-
     const params: AgroReportParams = {
-        startDate,
-        endDate,
-        cropBaseTemp: cropBaseTemp ? Number(cropBaseTemp) : 10,
-        cropMaxTemp: cropMaxTemp ? Number(cropMaxTemp) : 30,
-        cropName
+        startDate: queryDto.startDate,
+        endDate: queryDto.endDate,
+        cropBaseTemp: queryDto.cropBaseTemp ? Number(queryDto.cropBaseTemp) : 10,
+        cropMaxTemp: queryDto.cropMaxTemp ? Number(queryDto.cropMaxTemp) : 30,
+        cropName: queryDto.cropName
     };
 
     try {
@@ -40,23 +51,28 @@ export class AgroAnalyticsController {
           data: report
       };
     } catch (error) {
+      this.logger.error(
+        `Error generando reporte agro: ${error instanceof Error ? error.message : String(error)}`,
+      );
       throw new HttpException({
           success: false,
-          message: error.message || 'Error al generar el reporte'
+          message: 'No fue posible generar el reporte en este momento.'
       }, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
   @Post('chat')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @GeminiEndpoint('chat')
   @ApiOperation({ summary: 'Chat con la IA sobre el reporte generado' })
-  @ApiBody({ schema: { example: { question: '¿Debo regar mañana?', reportContext: {} } } })
   async chatWithReport(
-    @Body() body: { reportContext: any; question: string; chatHistory?: { role: string; content: string }[] },
+    @Body() bodyDto: ChatReportDto,
   ) {
-    if (!body.reportContext || !body.question) {
-        throw new BadRequestException('Falta el contexto del reporte o la pregunta.');
-    }
-    const answer = await this.analyticsService.chatWithAI(body.question, body.reportContext, body.chatHistory ?? []);
+    const answer = await this.analyticsService.chatWithAI(
+      bodyDto.question, 
+      bodyDto.reportContext, 
+      bodyDto.chatHistory ?? []
+    );
     return {
         answer
     };
