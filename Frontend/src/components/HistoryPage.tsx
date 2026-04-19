@@ -1,4 +1,4 @@
-// src/components/HistoryPage.tsx
+﻿// src/components/HistoryPage.tsx
 import {
   Box,
   Heading,
@@ -83,7 +83,7 @@ const GradientBorderBox = ({ children }: { children: React.ReactNode }) => (
         p="1px"
         borderRadius="xl"
         bgGradient="linear(to-b, rgba(255, 129, 68, 0.4), rgba(255, 255, 255, 0.1))"
-        h="100%" // Añadimos h="100%" para asegurar que el borde ocupe toda la altura
+        h="100%" // AÃ±adimos h="100%" para asegurar que el borde ocupe toda la altura
     >
         <Box bg="#1A1A1A" p={6} borderRadius="xl" h="100%">
             {children}
@@ -112,15 +112,15 @@ export const HistoryPage = () => {
   const lineChartData = {
     labels: chartLabels,
     datasets: [
-      { label: 'Temp. Máxima (°C)', data: filteredData.map(d => d.tempMax).reverse(), borderColor: '#ff8a50', backgroundColor: '#ff8a50' },
-      { label: 'Temp. Mínima (°C)', data: filteredData.map(d => d.tempMin).reverse(), borderColor: '#D2B48C', backgroundColor: '#D2B48C' },
+      { label: 'Temp. MÃ¡xima (Â°C)', data: filteredData.map(d => d.tempMax).reverse(), borderColor: '#ff8a50', backgroundColor: '#ff8a50' },
+      { label: 'Temp. MÃ­nima (Â°C)', data: filteredData.map(d => d.tempMin).reverse(), borderColor: '#D2B48C', backgroundColor: '#D2B48C' },
     ],
   };
   
   const barChartData = {
     labels: chartLabels,
     datasets: [
-      { label: 'Precipitación (mm)', data: filteredData.map(d => d.rain).reverse(), backgroundColor: '#646cff' },
+      { label: 'PrecipitaciÃ³n (mm)', data: filteredData.map(d => d.rain).reverse(), backgroundColor: '#646cff' },
     ],
   };
 
@@ -135,20 +135,20 @@ export const HistoryPage = () => {
         </Heading>
       </Box>
 
-      {/* ✅ MEJORA: Reemplazamos HStack por SimpleGrid para lograr simetría. */}
+      {/* âœ… MEJORA: Reemplazamos HStack por SimpleGrid para lograr simetrÃ­a. */}
       <SimpleGrid columns={{ base: 1, md: 3 }} spacing={6}>
         <GradientBorderBox>
             {/* Hacemos que el contenido se centre y ocupe toda la altura */}
             <VStack align="start" spacing={4} justifyContent="center" h="100%">
                 <Text color="brand.text" fontWeight="bold">Selecciona un rango</Text>
                 <HStack>
-                    <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
-                    <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
+                    <Input type="date" max={new Date().toISOString().split('T')[0]} value={startDate} onChange={e => setStartDate(e.target.value)} />
+                    <Input type="date" max={new Date().toISOString().split('T')[0]} value={endDate} onChange={e => setEndDate(e.target.value)} />
                 </HStack>
             </VStack>
         </GradientBorderBox>
-        <StatCard title="Temperatura Promedio" value={`${avgTemp}°C`} />
-        <StatCard title="Precipitación Total" value={`${totalRain} mm`} />
+        <StatCard title="Temperatura Promedio" value={`${avgTemp}Â°C`} />
+        <StatCard title="PrecipitaciÃ³n Total" value={`${totalRain} mm`} />
       </SimpleGrid>
 
       <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={6}>
@@ -162,9 +162,9 @@ export const HistoryPage = () => {
             <Thead>
               <Tr>
                 <Th>Fecha</Th>
-                <Th isNumeric>Temp. Máx (°C)</Th>
-                <Th isNumeric>Temp. Mín (°C)</Th>
-                <Th isNumeric>Precipitación (mm)</Th>
+                <Th isNumeric>Temp. MÃ¡x (Â°C)</Th>
+                <Th isNumeric>Temp. MÃ­n (Â°C)</Th>
+                <Th isNumeric>PrecipitaciÃ³n (mm)</Th>
               </Tr>
             </Thead>
             <Tbody>
