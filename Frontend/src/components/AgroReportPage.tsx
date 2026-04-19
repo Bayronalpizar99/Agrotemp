@@ -1,4 +1,4 @@
-﻿// src/components/AgroReportPage.tsx
+// src/components/AgroReportPage.tsx
 import { useState, useRef, useEffect } from 'react';
 import { keyframes } from '@emotion/react';
 import {
@@ -140,13 +140,13 @@ const slideInFromRight = keyframes`
 `;
 
 const CROPS = [
-    { name: 'MaÃ­z', base: 10, max: 30 },
+    { name: 'Maíz', base: 10, max: 30 },
     { name: 'Trigo', base: 5, max: 25 },
     { name: 'Soya', base: 10, max: 30 },
     { name: 'Tomate', base: 10, max: 28 },
     { name: 'Papa', base: 7, max: 25 },
     { name: 'Arroz', base: 10, max: 35 },
-    { name: 'CafÃ©', base: 18, max: 25 },
+    { name: 'Café', base: 18, max: 25 },
     { name: 'Frijol', base: 10, max: 28 },
     { name: 'Personalizado', base: 10, max: 30 },
 ];
@@ -172,7 +172,7 @@ interface PersistedAgroReportState {
   currentReport: AgroReportResult | null;
   isMobileFiltersOpen: boolean;
   showCustomInputs?: boolean;
-  reportCropName?: string; // cultivo con el que se generÃ³ el reporte activo
+  reportCropName?: string; // cultivo con el que se generó el reporte activo
 }
 
 const AGRO_REPORT_SESSION_KEY = 'agro_report_session_v1';
@@ -180,7 +180,7 @@ const AGRO_REPORT_SESSION_KEY = 'agro_report_session_v1';
 const INITIAL_ASSISTANT_MESSAGE: ChatMessage = {
   id: 1,
   role: 'assistant',
-  content: 'Â¡Hola! Soy tu asistente de Agricultura de PrecisiÃ³n. Configura los parÃ¡metros abajo y genera un reporte para comenzar.'
+  content: '¡Hola! Soy tu asistente de Agricultura de Precisión. Configura los parámetros abajo y genera un reporte para comenzar.'
 };
 
 const loadPersistedAgroReportState = (): PersistedAgroReportState | null => {
@@ -200,7 +200,7 @@ export const AgroReportPage = () => {
   const [persistedState] = useState<PersistedAgroReportState | null>(() => loadPersistedAgroReportState());
   const [startDate, setStartDate] = useState(persistedState?.startDate ?? '');
   const [endDate, setEndDate] = useState(persistedState?.endDate ?? '');
-  const [selectedCrop, setSelectedCrop] = useState(persistedState?.selectedCrop ?? 'MaÃ­z'); 
+  const [selectedCrop, setSelectedCrop] = useState(persistedState?.selectedCrop ?? 'Maíz'); 
   const [baseTemp, setBaseTemp] = useState(persistedState?.baseTemp ?? 10);
   const [maxTemp, setMaxTemp] = useState(persistedState?.maxTemp ?? 30);
   
@@ -472,8 +472,8 @@ export const AgroReportPage = () => {
                     </Text>
                 </Heading>
                 <Text fontSize="xl" color="gray.400" textAlign="center" maxW="600px">
-                    Tu asistente inteligente para agricultura de precisiÃ³n. <br />
-                    Configura los parÃ¡metros abajo y genera un reporte para comenzar.
+                    Tu asistente inteligente para agricultura de precisión. <br />
+                    Configura los parámetros abajo y genera un reporte para comenzar.
                 </Text>
             </VStack>
         )}
@@ -507,7 +507,7 @@ export const AgroReportPage = () => {
                         ) : msg.reportData ? (
                             <VStack align="stretch" spacing={4}>
                                 <Text fontWeight="bold" color="green.300">
-                                    Reporte AgrometeorolÃ³gico: {msg.cropName}
+                                    Reporte Agrometeorológico: {msg.cropName}
                                 </Text>
                                 <Text fontSize="md" whiteSpace="pre-line" lineHeight="1.6">
                                     {msg.reportData.aiAnalysis}
@@ -518,19 +518,19 @@ export const AgroReportPage = () => {
                                     <MetricCard
                                       label="GDD"
                                       value={msg.reportData.metrics.gdd}
-                                      unit="Â°D"
+                                      unit="°D"
                                       icon={FiSun}
                                       color="orange.300"
                                     />
                                     <MetricCard
-                                      label="Balance HÃ­drico"
+                                      label="Balance Hídrico"
                                       value={msg.reportData.metrics.waterBalance.balance}
                                       unit="mm"
                                       icon={FiDroplet}
                                       color="blue.300"
                                     />
                                     <MetricCard
-                                      label="EstrÃ©s Calor"
+                                      label="Estrés Calor"
                                       value={msg.reportData.metrics.stressHours ? msg.reportData.metrics.stressHours.heatStressHours : 0}
                                       unit="hrs"
                                       icon={FiThermometer}
@@ -570,9 +570,9 @@ export const AgroReportPage = () => {
 
                                 <SimpleGrid columns={{ base: 1, md: 2 }} spacing={3}>
                                    <CardWrapper>
-                                      <Text fontSize="xs" fontWeight="bold" color="gray.400" mb={2} textTransform="uppercase">Ventanas PulverizaciÃ³n</Text>
+                                      <Text fontSize="xs" fontWeight="bold" color="gray.400" mb={2} textTransform="uppercase">Ventanas Pulverización</Text>
                                       <HStack justify="space-between" mb={1}>
-                                          <Text fontSize="sm">Ã“ptimas (viento + HR + sin lluvia):</Text>
+                                          <Text fontSize="sm">Óptimas (viento + HR + sin lluvia):</Text>
                                           <Text fontWeight="bold" color="green.300">
                                               {msg.reportData.metrics.optimalWindows?.optimalSprayHours || 0} hrs
                                           </Text>
@@ -591,7 +591,7 @@ export const AgroReportPage = () => {
                                    <CardWrapper>
                                       <Text fontSize="xs" fontWeight="bold" color="gray.400" mb={2} textTransform="uppercase">Temp Extrema</Text>
                                        <HStack justify="space-between" mb={1}>
-                                          <Text fontSize="sm">FrÃ­o:</Text>
+                                          <Text fontSize="sm">Frío:</Text>
                                           <Text fontWeight="bold" color="blue.300">
                                               {msg.reportData.metrics.stressHours?.coldStressHours || 0} h
                                           </Text>
@@ -608,7 +608,7 @@ export const AgroReportPage = () => {
                                 {msg.reportData.chartData && msg.reportData.chartData.length > 0 && (
                                     <Box mt={4} bg="blackAlpha.300" p={4} borderRadius="xl">
                                         <Text fontWeight="bold" color="gray.300" mb={4} fontSize="sm">
-                                            EvoluciÃ³n Diaria: Temperaturas, GDD y Lluvia
+                                            Evolución Diaria: Temperaturas, GDD y Lluvia
                                         </Text>
                                         <Box h="300px" w="100%">
                                             <ResponsiveContainer width="100%" height="100%">
@@ -628,7 +628,7 @@ export const AgroReportPage = () => {
                                                           val.toString().split('-').slice(1).join('/')
                                                         }
                                                     />
-                                                    <YAxis yAxisId="left" stroke="#718096" fontSize={12} label={{ value: 'Temp (Â°C)', angle: -90, position: 'insideLeft', fill: '#718096' }}/>
+                                                    <YAxis yAxisId="left" stroke="#718096" fontSize={12} label={{ value: 'Temp (°C)', angle: -90, position: 'insideLeft', fill: '#718096' }}/>
                                                     <YAxis yAxisId="right" orientation="right" stroke="#ed8936" fontSize={12} label={{ value: 'GDD', angle: 90, position: 'insideRight', fill: '#ed8936' }}/>
                                                     <YAxis yAxisId="rain" orientation="right" hide domain={[0, 'auto']} />
                                                     <Tooltip 
@@ -648,7 +648,7 @@ export const AgroReportPage = () => {
                                                         yAxisId="right"
                                                         type="monotone" 
                                                         dataKey="gdd" 
-                                                        name="Grados DÃ­a (GDD)" 
+                                                        name="Grados Día (GDD)" 
                                                         stroke="#ed8936" 
                                                         fillOpacity={1} 
                                                         fill="url(#colorGdd)" 
@@ -657,7 +657,7 @@ export const AgroReportPage = () => {
                                                         yAxisId="left"
                                                         type="monotone" 
                                                         dataKey="tMax" 
-                                                        name="T. MÃ¡x" 
+                                                        name="T. Máx" 
                                                         stroke="#FC8181" 
                                                         strokeWidth={2}
                                                         dot={false}
@@ -666,7 +666,7 @@ export const AgroReportPage = () => {
                                                         yAxisId="left"
                                                         type="monotone" 
                                                         dataKey="tMin" 
-                                                        name="T. MÃ­n" 
+                                                        name="T. Mín" 
                                                         stroke="#63B3ED" 
                                                         strokeWidth={2}
                                                         dot={false}
@@ -710,7 +710,7 @@ export const AgroReportPage = () => {
             gap={2}
             direction="column"
         >
-            {/* Context header â€” visible only when a report is active */}
+            {/* Context header — visible only when a report is active */}
             {currentReport && (
               <HStack
                 px={3}
@@ -748,7 +748,7 @@ export const AgroReportPage = () => {
                   <HStack spacing={1}>
                     <Icon as={FiCalendar} color="rgba(255,129,68,0.5)" boxSize={3} />
                     <Text fontSize="xs" color="rgba(255,255,255,0.55)" fontFamily="'JetBrains Mono', monospace">
-                      {currentReport.period.startDate} â†’ {currentReport.period.endDate}
+                      {currentReport.period.startDate} → {currentReport.period.endDate}
                     </Text>
                   </HStack>
                 </HStack>
@@ -769,7 +769,7 @@ export const AgroReportPage = () => {
                 rightIcon={<Icon as={isMobileFiltersOpen ? FiChevronUp : FiChevronDown} />}
                 onClick={() => setIsMobileFiltersOpen(prev => !prev)}
             >
-                ParÃ¡metros de anÃ¡lisis
+                Parámetros de análisis
             </Button>
 
             <Collapse in={isMobileFiltersOpen} animateOpacity style={{ width: '100%' }}>
@@ -828,8 +828,8 @@ export const AgroReportPage = () => {
                     {selectedCrop === 'Personalizado' && showCustomInputs && (
                         <SimpleGrid columns={1} spacing={2}>
                             <Box>
-                                <Text fontSize="xs" color="gray.300" mb={1}>Temperatura base (Â°C)</Text>
-                                <Text fontSize="2xs" color="gray.500" mb={1}>Umbral mÃ­nimo para acumular GDD.</Text>
+                                <Text fontSize="xs" color="gray.300" mb={1}>Temperatura base (°C)</Text>
+                                <Text fontSize="2xs" color="gray.500" mb={1}>Umbral mínimo para acumular GDD.</Text>
                                 <Input
                                     size="sm"
                                     type="number"
@@ -846,8 +846,8 @@ export const AgroReportPage = () => {
                                 />
                             </Box>
                             <Box>
-                                <Text fontSize="xs" color="gray.300" mb={1}>Temperatura mÃ¡xima Ã³ptima (Â°C)</Text>
-                                <Text fontSize="2xs" color="gray.500" mb={1}>LÃ­mite superior recomendado del cultivo.</Text>
+                                <Text fontSize="xs" color="gray.300" mb={1}>Temperatura máxima óptima (°C)</Text>
+                                <Text fontSize="2xs" color="gray.500" mb={1}>Límite superior recomendado del cultivo.</Text>
                                 <Input
                                     size="sm"
                                     type="number"
@@ -1028,8 +1028,8 @@ export const AgroReportPage = () => {
                 >
                     <SimpleGrid columns={2} spacing={3}>
                         <Box>
-                            <Text fontSize="xs" color="gray.300" mb={1}>Temperatura base (Â°C)</Text>
-                            <Text fontSize="2xs" color="gray.500" mb={2}>Umbral mÃ­nimo para acumular GDD.</Text>
+                            <Text fontSize="xs" color="gray.300" mb={1}>Temperatura base (°C)</Text>
+                            <Text fontSize="2xs" color="gray.500" mb={2}>Umbral mínimo para acumular GDD.</Text>
                             <Input
                                 size="sm"
                                 type="number"
@@ -1046,8 +1046,8 @@ export const AgroReportPage = () => {
                             />
                         </Box>
                         <Box>
-                            <Text fontSize="xs" color="gray.300" mb={1}>Temperatura mÃ¡xima Ã³ptima (Â°C)</Text>
-                            <Text fontSize="2xs" color="gray.500" mb={2}>LÃ­mite superior recomendado del cultivo.</Text>
+                            <Text fontSize="xs" color="gray.300" mb={1}>Temperatura máxima óptima (°C)</Text>
+                            <Text fontSize="2xs" color="gray.500" mb={2}>Límite superior recomendado del cultivo.</Text>
                             <Input
                                 size="sm"
                                 type="number"
@@ -1083,12 +1083,12 @@ export const AgroReportPage = () => {
             <ModalBody pb={6}>
                 <VStack spacing={4} align="stretch">
                     <Text fontSize="sm" color="gray.400">
-                        Describe tu consulta para obtener un anÃ¡lisis detallado sobre el reporte actual.
+                        Describe tu consulta para obtener un análisis detallado sobre el reporte actual.
                     </Text>
                     <Textarea 
                         value={inputText}
                         onChange={(e) => setInputText(e.target.value)}
-                        placeholder="Escribe tu pregunta aquÃ­..."
+                        placeholder="Escribe tu pregunta aquí..."
                         size="lg"
                         minH="200px"
                         bg="whiteAlpha.50"
@@ -1146,4 +1146,3 @@ export const AgroReportPage = () => {
     </Flex>
   );
 };
-
