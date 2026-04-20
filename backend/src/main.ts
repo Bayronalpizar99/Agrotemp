@@ -15,6 +15,10 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const isProduction = process.env.NODE_ENV === 'production';
 
+  // Configurar proxy inverso para Rate Limiting en producción (Render/Railway)
+  const httpAdapter = app.getHttpAdapter().getInstance();
+  httpAdapter.set('trust proxy', 1);
+
   // Global prefix
   app.setGlobalPrefix('api');
 
