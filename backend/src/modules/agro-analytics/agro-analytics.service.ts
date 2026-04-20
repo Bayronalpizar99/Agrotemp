@@ -19,7 +19,7 @@ export interface AgroReportParams {
 @Injectable()
 export class AgroAnalyticsService {
   private readonly logger = new Logger(AgroAnalyticsService.name);
-  private genAI: GoogleGenerativeAI;
+  private genAI?: GoogleGenerativeAI;
 
   constructor(
     private readonly weatherService: WeatherService,
