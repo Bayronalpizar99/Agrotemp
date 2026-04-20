@@ -225,7 +225,8 @@ export class AgroAnalyticsService {
         ? Number(etoValues.reduce((sum, v) => sum + (v ?? 0), 0).toFixed(2))
         : null;
     } catch (err) {
-      this.logger.warn(`Error al consultar Open-Meteo: ${err?.message ?? err}`);
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Error al consultar Open-Meteo: ${errorMessage}`);
       return null;
     }
   }
