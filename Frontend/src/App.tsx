@@ -9,6 +9,7 @@ import { ParticleBackground } from './components/ParticleBackground';
 import { AgroReportPage } from './components/AgroReportPage';
 import { FeedbackWidget } from './components/FeedbackWidget';
 import { ParcelasPage } from './components/ParcelasPage';
+import { ReleaseNotesModal } from './components/ReleaseNotesModal';
 
 const ACTIVE_PAGE_SESSION_KEY = 'active_page_session_v1';
 
@@ -74,6 +75,7 @@ function App() {
         </Box>
       </Box>
     </Box>
+    <ReleaseNotesModal />
     <FeedbackWidget activePage={activePage} />
     </>
   );
