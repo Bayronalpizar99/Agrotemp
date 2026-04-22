@@ -70,8 +70,8 @@ export const Header = ({ activePage, setActivePage }: HeaderProps) => {
     }
     setIsLoading(true);
     try {
-      const startDateStr = startDate.toISOString().split('T')[0] + 'T00:00:00.000Z';
-      const endDateStr = endDate.toISOString().split('T')[0] + 'T23:59:59.999Z';
+      const startDateStr = startDate.toISOString().split('T')[0];
+      const endDateStr = endDate.toISOString().split('T')[0];
       const result = await weatherService.downloadHourlyData(startDateStr, endDateStr);
       if (result.success) {
         toast({ title: 'Éxito', description: 'Los datos se han descargado correctamente', status: 'success', duration: 3000, isClosable: true });
