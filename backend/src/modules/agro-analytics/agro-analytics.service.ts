@@ -423,6 +423,13 @@ export class AgroAnalyticsService {
 
   // --- Helper: Agrupar por fecha (YYYY-MM-DD) ---
   private groupByDay(data: HourlyWeatherData[]): Record<string, HourlyWeatherData[]> {
+    const toLocalDateKey = (date: Date) => {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    };
+
     return data.reduce((acc, curr) => {
       // Asumimos que curr.fecha es string o Date. Normalizar a YYYY-MM-DD
       // En tu servicio actual fecha parece ser Date (timestamp firestore)
@@ -430,7 +437,7 @@ export class AgroAnalyticsService {
       try {
           // Primero intentamos con 'fecha' (minúscula) como indica la interfaz
           if (curr.fecha instanceof Date) {
-              dateKey = curr.fecha.toISOString().split('T')[0];
+              dateKey = toLocalDateKey(curr.fecha);
           } 
           // Soporte legacy por si acaso viene como string o con mayúscula en algún punto
           else if (typeof curr.fecha === 'string') {
@@ -440,7 +447,7 @@ export class AgroAnalyticsService {
           else if ((curr as any).Fecha) {
               const f = (curr as any).Fecha;
                if (f instanceof Date) {
-                  dateKey = f.toISOString().split('T')[0];
+                  dateKey = toLocalDateKey(f);
                } else if (typeof f === 'string') {
                   const match = f.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
                   if (match) {

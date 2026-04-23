@@ -9,6 +9,121 @@ export class WeatherService {
         @Inject('FIRESTORE') private readonly firestore: Firestore
     ) {}
 
+    private parseDateOnlyParts(dateStr?: string): { year: number; month: number; day: number } | null {
+        if (typeof dateStr !== 'string') return null;
+        const match = dateStr.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (!match) return null;
+
+        const year = Number(match[1]);
+        const month = Number(match[2]);
+        const day = Number(match[3]);
+        if ([year, month, day].some((value) => Number.isNaN(value))) return null;
+
+        return { year, month, day };
+    }
+
+    private buildLocalRangeLimits(startDate: string, endDate: string): { startLimit: number; endLimit: number } {
+        const startParts = this.parseDateOnlyParts(startDate);
+        const endParts = this.parseDateOnlyParts(endDate);
+        if (!startParts || !endParts) {
+            throw new Error('Formato de fecha inválido. Usa YYYY-MM-DD.');
+        }
+
+        const startLimit = new Date(
+            startParts.year,
+            startParts.month - 1,
+            startParts.day,
+            0,
+            0,
+            0,
+            0
+        ).getTime();
+        const endLimit = new Date(
+            endParts.year,
+            endParts.month - 1,
+            endParts.day,
+            23,
+            59,
+            59,
+            999
+        ).getTime();
+
+        return { startLimit, endLimit };
+    }
+
+    private buildCostaRicaUtcRange(startDate: string, endDate: string): { startUTC: Date; endUTC: Date } {
+        const startParts = this.parseDateOnlyParts(startDate);
+        const endParts = this.parseDateOnlyParts(endDate);
+        if (!startParts || !endParts) {
+            throw new Error('Formato de fecha inválido. Usa YYYY-MM-DD.');
+        }
+
+        // Costa Rica (UTC-6) sin DST:
+        // 00:00 CR = 06:00 UTC
+        const startUTC = new Date(
+            Date.UTC(startParts.year, startParts.month - 1, startParts.day, 6, 0, 0, 0)
+        );
+        // 23:59:59.999 CR = (día siguiente 05:59:59.999 UTC)
+        const endUTC = new Date(
+            Date.UTC(endParts.year, endParts.month - 1, endParts.day + 1, 6, 0, 0, 0) - 1
+        );
+
+        return { startUTC, endUTC };
+    }
+
+    private parseFechaIMN(dateStr?: string): Date | null {
+        if (typeof dateStr !== 'string') return null;
+
+        const rawValue = dateStr.replace(/"/g, '').trim();
+        if (!rawValue) return null;
+
+        // Formato esperado: "DD/MM/YYYY HH:mm a.m./p.m." con variaciones
+        const cleanDate = rawValue.replace(/\./g, '').toLowerCase();
+        const parts = cleanDate.split(/\s+/).filter(Boolean);
+        if (parts.length === 0) return null;
+
+        const datePart = parts[0];
+        const dateMatch = datePart.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+        if (!dateMatch) {
+            const fallback = new Date(rawValue);
+            return Number.isNaN(fallback.getTime()) ? null : fallback;
+        }
+
+        const day = Number(dateMatch[1]);
+        const month = Number(dateMatch[2]);
+        const year = Number(dateMatch[3]);
+
+        let hours = 0;
+        let minutes = 0;
+
+        const timePartRaw = parts[1] ?? '';
+        const periodRaw = parts.slice(2).join('');
+        let timePart = timePartRaw;
+        let period = periodRaw;
+
+        if (timePart.includes('pm')) {
+            period = 'pm';
+            timePart = timePart.replace('pm', '');
+        }
+        if (timePart.includes('am')) {
+            period = 'am';
+            timePart = timePart.replace('am', '');
+        }
+
+        const sanitizedTime = timePart.replace(/[^\d:]/g, '');
+        if (sanitizedTime) {
+            const [parsedHours, parsedMinutes] = sanitizedTime.split(':').map(Number);
+            if (!Number.isNaN(parsedHours)) hours = parsedHours;
+            if (!Number.isNaN(parsedMinutes)) minutes = parsedMinutes;
+        }
+
+        if (period === 'pm' && hours !== 12) hours += 12;
+        if (period === 'am' && hours === 12) hours = 0;
+
+        const parsedDate = new Date(year, month - 1, day, hours, minutes, 0, 0);
+        return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
+    }
+
     // Obtener datos actuales
     async getCurrentWeather(): Promise<CurrentWeatherData> {
         try {
@@ -43,40 +158,11 @@ export class WeatherService {
     }
 
     private sortDocsByCustomDate(docs: any[]): any[] {
-        // Función helper para parsear la fecha custom
-        const parseCustomDate = (dateStr: string) => {
-            if (!dateStr) return 0;
-            // Formato esperado: "19/02/2026 02:00 p.m." con posibles variaciones de espacios
-            try {
-                // Eliminar puntos u caracteres extraños y normalizar
-                const cleanDate = dateStr.replace(/\./g, '').toLowerCase().trim();
-                // Separar fecha (19/02/2026) y hora+periodo (02:00 pm)
-                const parts = cleanDate.split(/\s+/);
-                
-                if (parts.length < 2) return 0;
-
-                const datePart = parts[0]; 
-                // Puede que la hora y el am/pm esten juntos o separados
-                let timePart = parts[1];
-                let period = parts.length > 2 ? parts[2] : '';
-                
-                // Si timePart contiene 'pm' o 'am'
-                if (timePart.includes('pm')) { period = 'pm'; timePart = timePart.replace('pm', ''); }
-                if (timePart.includes('am')) { period = 'am'; timePart = timePart.replace('am', ''); }
-
-                const [day, month, year] = datePart.split('/').map(Number);
-                let [hours, minutes] = timePart.split(':').map(Number);
-                
-                if (period === 'pm' && hours !== 12) hours += 12;
-                if (period === 'am' && hours === 12) hours = 0;
-                
-                return new Date(year, month - 1, day, hours, minutes).getTime();
-            } catch (e) {
-                return 0;
-            }
-        };
-
-        return [...docs].sort((a, b) => parseCustomDate(b.Fecha) - parseCustomDate(a.Fecha));
+        return [...docs].sort((a, b) => {
+            const bTimestamp = this.parseFechaIMN(b.Fecha)?.getTime() ?? 0;
+            const aTimestamp = this.parseFechaIMN(a.Fecha)?.getTime() ?? 0;
+            return bTimestamp - aTimestamp;
+        });
     }
 
     // Obtener datos horarios más recientes
@@ -122,26 +208,19 @@ export class WeatherService {
 
     private mapDataToWeather(dataList: any[]): HourlyWeatherData[] {
         return dataList.map(data => {
-            // Lógica robusta para extraer la fecha
+            // La fecha climática (campo "Fecha") tiene prioridad para el reporte.
             let fecha: Date;
-            
-            // 1. Prioridad: Timestamp de Firestore (objeto con toDate o _seconds)
-            if (data.timestamp_extraccion_lote && typeof data.timestamp_extraccion_lote.toDate === 'function') {
+
+            const parsedFecha = this.parseFechaIMN(data.Fecha);
+            if (parsedFecha) {
+                fecha = parsedFecha;
+            } else if (
+                data.timestamp_extraccion_lote &&
+                typeof data.timestamp_extraccion_lote.toDate === 'function'
+            ) {
+                // Respaldo si "Fecha" viene vacía o malformada.
                 fecha = data.timestamp_extraccion_lote.toDate();
-            } 
-            // 2. Si es string con formato DD/MM/YYYY
-            else if (typeof data.Fecha === 'string') {
-                 // Intentar parsear "DD/MM/YYYY HH:mm a.m./p.m." o similar
-                 const parts = data.Fecha.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
-                 if (parts) {
-                     // new Date(y, m-1, d)
-                     fecha = new Date(parseInt(parts[3]), parseInt(parts[2]) - 1, parseInt(parts[1]));
-                 } else {
-                     fecha = new Date(data.Fecha); // Intento fallback estandar
-                 }
-            }
-            // 3. Fallback final
-            else {
+            } else {
                 fecha = new Date();
             }
 
@@ -163,19 +242,7 @@ export class WeatherService {
     async getHourlyWeatherByDateRange(startDate: string, endDate: string): Promise<HourlyWeatherData[]> {
         try {
             console.log('Consultando datos horarios:', { startDate, endDate });
-
-            // Convertir las fechas a límites numéricos (Timestamp)
-            const startLimit = new Date(startDate).setHours(0, 0, 0, 0); // Inicio del día
-            
-            // Fin del día para la fecha final
-            const endLimitDate = new Date(endDate);
-            // IMPORTANTE: Sumar 1 día para incluir TODO el día final
-            // El selector envía YYYY-MM-DD (medianoche), por lo que sumar 1 día
-            // nos lleva al inicio del día siguiente, cubriendo así hasta las 23:59:59 del día actual
-            endLimitDate.setDate(endLimitDate.getDate() + 1);
-            endLimitDate.setMilliseconds(-1); // Retroceder 1ms para quedar en 23:59:59.999
-            
-            const endLimit = endLimitDate.getTime();
+            const { startLimit, endLimit } = this.buildLocalRangeLimits(startDate, endDate);
 
             console.log(`[WeatherService] Consultando rango: ${new Date(startLimit).toISOString()} - ${new Date(endLimit).toISOString()}`);
 
@@ -237,15 +304,7 @@ export class WeatherService {
             // "17 abril 23:59 CR" = "18 abril 05:59 UTC"
             // → sumar 6h a los límites para obtener el equivalente UTC del día CR.
             const CR_OFFSET_MS = 6 * 60 * 60 * 1000;
-
-            const startCR = new Date(startDate);
-            startCR.setHours(0, 0, 0, 0);
-            const startUTC = new Date(startCR.getTime() + CR_OFFSET_MS);
-
-            const endCR = new Date(endDate);
-            endCR.setDate(endCR.getDate() + 1);
-            endCR.setMilliseconds(-1);
-            const endUTC = new Date(endCR.getTime() + CR_OFFSET_MS);
+            const { startUTC, endUTC } = this.buildCostaRicaUtcRange(startDate, endDate);
 
             const snapshot = await this.firestore
                 .collection('datos_actuales')
@@ -303,15 +362,7 @@ export class WeatherService {
             // "17 abril 00:00 CR" = "17 abril 06:00 UTC"
             // → sumar 6h a los límites para obtener el equivalente UTC del día CR.
             const CR_OFFSET_MS = 6 * 60 * 60 * 1000;
-
-            const startCR = new Date(startDate);
-            startCR.setHours(0, 0, 0, 0);
-            const startUTC = new Date(startCR.getTime() + CR_OFFSET_MS);
-
-            const endCR = new Date(endDate);
-            endCR.setDate(endCR.getDate() + 1);
-            endCR.setMilliseconds(-1);
-            const endUTC = new Date(endCR.getTime() + CR_OFFSET_MS);
+            const { startUTC, endUTC } = this.buildCostaRicaUtcRange(startDate, endDate);
 
             const snapshot = await this.firestore
                 .collection('datos_actuales')
